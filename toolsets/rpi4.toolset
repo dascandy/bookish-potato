@@ -1,0 +1,7 @@
+
+template: __builtin_clang
+compiler: clang++ -mcpu=cortex-a72 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hardfp -fno-rtti -fno-exceptions
+linker: clang++
+archiver: ar
+
+
