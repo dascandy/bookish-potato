@@ -1,7 +1,10 @@
 
 template: __builtin_clang
-compiler: clang++ -mcpu=cortex-a72 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hardfp -fno-rtti -fno-exceptions
+compiler: clang++ --sysroot=sysroot --target=aarch64-unknown-linux-gnu 
+compiler-cpp: clang++ --sysroot=sysroot --target=aarch64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include
+# -mcpu=cortex-a72 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hardfp -fno-rtti -fno-exceptions
 linker: clang++
 archiver: ar
+cross: true
 
 

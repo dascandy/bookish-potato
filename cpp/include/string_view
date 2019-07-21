@@ -1,0 +1,27 @@
+#pragma once
+
+namespace std {
+  class string_view {
+  public:
+    template <size_t N>
+    string_view(const char (&arr)[N])
+    : begin_(arr)
+    , end_(arr + N)
+    {}
+    string_view(const char* begin, const char* end = nullptr)
+    : begin_(begin)
+    , end_(end)
+    {
+      if (!end_) {
+        end_ = begin_;
+        while (*end_) end_++;
+      }
+    }
+    const char* begin() { return begin_; }
+    const char* end() { return end_; }
+  private:
+    const char* begin_, *end_;
+  };
+}
+
+

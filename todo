@@ -1,0 +1,29 @@
+V Bootable on x86 qemu
+- SMP on x86
+- Memory management
+- Interrupt handling on x86 qemu
+
+- Bootable on rpi4
+- RPI4-4gb support
+- Interrupt handling on rpi4
+
+- PCI enumeration
+- XHCI driver
+- USB stack
+- USB HID
+- Network stack IPv6 (SLAAC start)
+- Network driver x86
+- Network driver ARM/RPI4
+- Network stack IPv6
+- DHCPv6 ?
+
+- Multiprocess support
+- Kernel-user channel
+- SSL implementation
+- HTTPS client
+- SSH client
+- Terminal emulator
+
+- POSIX emulation layer
+- Program execution
+

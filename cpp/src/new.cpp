@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdlib>
 
 void *operator new(size_t size)
 {
