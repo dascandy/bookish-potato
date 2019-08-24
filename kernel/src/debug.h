@@ -14,6 +14,9 @@ inline void debug_field(uint16_t value, std::string_view spec) { debug_field((ui
 inline void debug_field(uint8_t value, std::string_view spec) { debug_field((uint64_t)value, spec); }
 void debug_field(int64_t value, std::string_view spec);
 void debug_field(std::string_view text, std::string_view spec = "");
+inline void debug_field(const char* value, std::string_view spec) {
+  debug_field(std::string_view(value), spec);
+}
 
 inline void debug(std::string_view text) {
   debug_field(text, "");

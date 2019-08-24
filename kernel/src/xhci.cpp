@@ -53,6 +53,57 @@ void disable_efi() {
 }
 */
 
+struct xhci_speed {
+  void debugprint() {
+    if (spd_mantissa == 0) {
+      debug("<reserved>");
+    } else {
+      debug("{} {} ", spd_mantissa, (spd_exponent == '0' ? "bps" : (spd_exponent == '1' ? "Kbps" : (spd_exponent == '2' ? "Mbps" : "Gbps"))));
+      if (fullduplex) debug("full duplex ");
+    }
+  }
+  bool fullduplex;
+  uint8_t spd_exponent;
+  uint16_t spd_mantissa;
+  uint8_t linkprot = 0;
+  uint8_t symmetric = 0;
+  uint8_t slottype = 0;
+};
+
+xhci_speed vtbl[16] = {
+  {},
+  { false, 2, 12 },
+  { false, 1, 1500 },
+  { false, 2, 480 },
+  { true, 3, 5 },
+  { true, 3, 10 },
+  { true, 3, 10 },
+  { true, 3, 20 },
+};
+
+static constexpr const char* plstab[16] = {
+  "U0",
+  "U1",
+  "U2",
+  "U3",
+  "Disabled",
+  "RxDetect",
+  "Inactive",
+  "Polling",
+  "Recovery",
+  "Hot Reset",
+  "Compliance Mode",
+  "Test Mode",
+  "Reserved 12",
+  "Reserved 13",
+  "Reserved 14",
+  "Resume",
+};
+
+void extractPsids(pcidevice dev) {
+
+}
+
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
 {
@@ -99,9 +150,12 @@ XhciDevice::XhciDevice(pcidevice dev)
   mmio_write<uint32_t>(opregs + RT_CONFIG, mmio_read<uint32_t>(opregs + RT_CONFIG) | maxslots);
 
   for (size_t n = 0; n < maxports; n++) {
-    uint32_t sc = mmio_read<uint32_t>(cr + 0x400 + n * 16 + P_SC);
-    uint32_t pmsc = mmio_read<uint32_t>(cr + 0x400 + n * 16 + P_PMSC);
-    uint32_t li = mmio_read<uint32_t>(cr + 0x400 + n * 16 + P_LI);
+    uint32_t sc = mmio_read<uint32_t>(opregs + 0x400 + n * 16 + P_SC);
+    uint32_t pmsc = mmio_read<uint32_t>(opregs + 0x400 + n * 16 + P_PMSC);
+    uint32_t li = mmio_read<uint32_t>(opregs + 0x400 + n * 16 + P_LI);
+    debug("port {} {} {} ", n, (sc & 1 ? "connected" : "no device"), sc & 2 ? "enabled " : "disabled");
+    debug("{}\n", plstab[(sc >> 5) & 0xF]);
+    vtbl[(sc >> 10) & 0xF].debugprint();
     debug("port {} {8x} {8x} {8x}\n", n, sc, pmsc, li);
   }
 
