@@ -2,12 +2,13 @@
 
 #include "pci.h"
 
-class Xhci {
+class XhciDevice : public PciDevice {
 public:
-  Xhci(pcidevice dev);
+  XhciDevice(pcidevice dev);
 private:
   void start();
   pcidevice dev;
+  uintptr_t cr, rr, doorbell;
 };
 
 

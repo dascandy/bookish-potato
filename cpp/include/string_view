@@ -19,6 +19,7 @@ namespace std {
     }
     const char* begin() { return begin_; }
     const char* end() { return end_; }
+    char operator[](size_t offset) { return begin_[offset]; }
   private:
     const char* begin_, *end_;
   };

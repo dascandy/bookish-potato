@@ -1,79 +1,114 @@
 #include "xhci.h"
 #include "pci.h"
-#include "platform.h"
-#include "future.h"
+#include "debug.h"
+#include "io.h"
 
-#define VIRTUAL_ADDRESS 0xFFFFFF00FFFFF000
+constexpr uint64_t CR_CAPLENGTH = 0;
+constexpr uint64_t CR_HCIVERSION = 2;
+constexpr uint64_t CR_HCSPARAMS1 = 4;
+constexpr uint64_t CR_HCSPARAMS2 = 8;
+constexpr uint64_t CR_HCSPARAMS3 = 12;
+constexpr uint64_t CR_HCCPARAMS1 = 16;
+constexpr uint64_t CR_DBOFF = 20;
+constexpr uint64_t CR_RTSOFF = 24;
+constexpr uint64_t CR_HCCPARAMS2 = 28;
 
-struct capregs {
-  uint16_t caplength;
-  uint16_t hciversion;
-  uint32_t hcsparams1;
-  uint32_t hcsparams2;
-  uint32_t hcsparams3;
-  uint32_t hccparams;
-  uint32_t dboff;
-  uint32_t rtsoff;
-};
+constexpr uint64_t RT_USBCMD = 0x00;
+constexpr uint64_t RT_USBSTS = 0x04;
+constexpr uint64_t RT_PAGESIZE = 0x08;
+constexpr uint64_t RT_DNCTRL = 0x14;
+constexpr uint64_t RT_CRCR = 0x18;
+constexpr uint64_t RT_DCBAAP = 0x30;
+constexpr uint64_t RT_CONFIG = 0x38;
 
-struct opregs {
-  uint32_t usbcmd;
-  uint32_t usbsts;
-  uint32_t pagesize;
-  uint32_t pad0[2];
-  uint32_t dnctrl;
-  uint64_t crcr;
-  uint32_t pad1[4];
-  uint64_t dcbaap;
-  uint32_t config;
-};
+constexpr uint64_t P_SC = 0x00;
+constexpr uint64_t P_PMSC = 0x04;
+constexpr uint64_t P_LI = 0x08;
 
-struct portregs {
-  uint32_t portsc;
-  uint32_t portpmsc;
-  uint32_t portli;
-  uint32_t reserved;
-};
+constexpr uint64_t RT_USBSTS_HCH = 0x1;
+constexpr uint64_t RT_USBCMD_RUN = 0x00000001;
+constexpr uint64_t RT_USBCMD_RESET = 0x00000002;
 
-struct rtregs {
+/*
+void disable_efi() {
+  uint32_t legacy = findExtendedCap(XHCI_ECAP_LEGSUP);
+  if (legacy != 0)
+  {
+    uint32_t legreg = readCapabilityRegister(legacy, 32);
+    legreg |= (1 << 24);
+    writeCapabilityRegister(legacy, legreg, 32);
+    while (1)
+    {
+      legreg = readCapabilityRegister(legacy, 32);
+      if (((legreg & (1 << 24)) != 0) && ((legreg & (1 << 16)) == 0))
+        break;
+    }
+    kprintf(u"Taken control of XHCI from firmware\n");
+  }
+  //Disable SMIs
+  uint32_t legctlsts = readCapabilityRegister(legacy + 4, 32);
+  legctlsts &= XHCI_LEGCTLSTS_DISABLE_SMI;
+  legctlsts |= XHCI_LEGCTLSTS_EVENTS_SMI;
+  writeCapabilityRegister(legacy + 4, legctlsts, 32);
+}
+*/
 
-};
-
-Xhci::Xhci(pcidevice dev)
+XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
 {
-  uint64_t ptr = ((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10);
-  platform_map((void*)VIRTUAL_ADDRESS, ptr, DeviceRegisters);
-  volatile capregs* cr = (capregs*)(VIRTUAL_ADDRESS);
-  volatile opregs* opr = (opregs*)(VIRTUAL_ADDRESS + cr->caplength);
-  volatile portregs* pr = (portregs*)(VIRTUAL_ADDRESS + 0x400);
+  uint8_t version = pciread8(dev, 0x60);
+  uint8_t major = (version >> 4), minor = version & 0xF;
+  uint64_t ptr = (((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF8ULL;
+  debug("xhci for version {}.{} found at {x}\n", major, minor, ptr);
+
+  cr = ptr;
+  uint64_t opregs = ptr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
+  rr = ptr + mmio_read<uint32_t>(cr + CR_RTSOFF);
+  doorbell = ptr + mmio_read<uint32_t>(cr + CR_DBOFF);
+
+  uint32_t hcsparams1 = mmio_read<uint32_t>(cr + CR_HCSPARAMS1);
+  uint32_t maxports = (hcsparams1 >> 24) & 0xFF;
+  uint32_t maxinterrupters = (hcsparams1 >> 8) & 0x7FF;
+  uint32_t maxslots = (hcsparams1 >> 0) & 0xFF;
+  debug("maxports{} maxints{} maxslots{}\n", maxports, maxinterrupters, maxslots);
+
+  uint32_t xecp = (mmio_read<uint32_t>(cr + CR_HCCPARAMS1) >> 16) << 2;
+
+  while (xecp) {
+    uint32_t hv = mmio_read<uint32_t>(cr + xecp);
+    uint8_t id = hv & 0xFF;
+    uint8_t ne = (hv >> 8) & 0xFF;
+    debug("id={}\n", id);
+    if (ne == 0) break;
+    xecp += ne * 4;
+  }
+  pciwrite16(dev, 0x04, pciread16(dev, 0x04) | 6);
+
 /*
-
-  volatile rtregs* rr = (rtregs*)(VIRTUAL_ADDRESS + cr->rtsoff);
-  volatile uint32_t* doorbell = (uint32_t*)(VIRTUAL_ADDRESS + cr->dboff);
-
-  uint32_t maxports = (cr->hcsparams1 >> 24) & 0xFF;
-  uint32_t maxinterrupters = (cr->hcsparams1 >> 24) & 0x7FF;
-  uint32_t maxslots = (cr->hcsparams1 >> 0) & 0xFF;
-  printf("%d %d %d\n", maxports, maxinterrupters, maxslots);
-
   hc_constructRootPorts(&x->hc, BYTE4(x->CapRegs->hcsparams1), &USB_XHCI);
   printf("\nx->hc.rootPortCount: %u", x->hc.rootPortCount);
+*/
 
-  uint16_t pciCommandRegister = pci_configRead(x->PCIdevice, PCI_COMMAND, 2);
-  pci_configWrite_word(x->PCIdevice, PCI_COMMAND, pciCommandRegister | PCI_CMD_MMIO | PCI_CMD_BUSMASTER);
+  mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) & ~RT_USBCMD_RUN);
+  while ((mmio_read<uint32_t>(opregs + RT_USBSTS) & RT_USBSTS_HCH) == 0) {}
 
-  x->OpRegs->command &= ~CMD_RUN;
-  while((x->OpRegs->status & STS_HCH) == 0) {}
+  mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) | RT_USBCMD_RESET);
+  // TODO: sleep(1us)
+  while ((mmio_read<uint32_t>(opregs + RT_USBCMD) & RT_USBCMD_RESET) != 0) {}
 
-  x->OpRegs->command |= CMD_RESET;
-  while((x->OpRegs->command & CMD_RESET) != 0) {}
+  mmio_write<uint32_t>(opregs + RT_CONFIG, mmio_read<uint32_t>(opregs + RT_CONFIG) | maxslots);
 
+  for (size_t n = 0; n < maxports; n++) {
+    uint32_t sc = mmio_read<uint32_t>(cr + 0x400 + n * 16 + P_SC);
+    uint32_t pmsc = mmio_read<uint32_t>(cr + 0x400 + n * 16 + P_PMSC);
+    uint32_t li = mmio_read<uint32_t>(cr + 0x400 + n * 16 + P_LI);
+    debug("port {} {8x} {8x} {8x}\n", n, sc, pmsc, li);
+  }
+
+/*
   deactivateLegacySupport(x);
 
   x->OpRegs->devnotifctrl = 0x2;
-
-  x->OpRegs->config |= MAX_HC_SLOTS;
 
   // Program the Device Context Base Address Array Pointer (DCBAAP) register (5.4.6) with a 64-bit address pointing to where the Device Context Base Address Array is located.
   x->virt_deviceContextPointerArrayBase = malloc(sizeof(xhci_DeviceContextArray_t), 64 | HEAP_CONTINUOUS, "xhci_DevContextArray"); // Heap is contiguous below 4K. Alignment see Table 54
@@ -170,10 +205,6 @@ Xhci::Xhci(pcidevice dev)
     printfe("\nFatal Error: HCHalted set. Ports cannot be enabled.");
     xhci_showStatus(x);
   }
-
-  textColor(LIGHT_MAGENTA);
-  printf("\n\n>>> Press key to close this console. <<<");
-  getch();
 }
 
 
@@ -182,12 +213,6 @@ Xhci::Xhci(pcidevice dev)
 
 static void xhci_configureInterrupts(xhci_t* x)
 {
-  #ifdef _XHCI_DIAGNOSIS_
-    textColor(HEADLINE);
-    printf("\nconfigureInterrupts");
-    textColor(TEXT);
-  #endif
-
     // MSI (We do not support MSI-X)
     x->msiCapEnabled = pci_trySetMSIVector(x->PCIdevice, APICIRQ);
 

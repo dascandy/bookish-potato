@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace rodvin {
+namespace s2 {
 
 // String class, similar to std::string with the noted exceptions:
 // - Does not hold untyped data, but strict UTF8.

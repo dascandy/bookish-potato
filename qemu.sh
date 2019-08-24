@@ -12,6 +12,8 @@ qemu-system-x86_64 --cpu Skylake-Client \
     -device nvme,drive=D22,serial=1234 \
     -device sdhci-pci --device sd-card \
     -device bochs-display \
+    -debugcon stdio \
+    -d trace:usb_xhci_* \
     -kernel build/amd64/bin/kernel.i386
 # -nic tap,ipv6=on,ipv4=off,model=e1000,mac=52:54:98:76:54:32
 

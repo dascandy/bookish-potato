@@ -1,6 +1,9 @@
 #include "pci.h"
 #include "io.h"
 
+PciBridge::PciBridge(pcidevice dev, uint8_t subbusid) {}
+void PciBridge::AddDevice(pcidevice dev, PciDevice* devobj) {}
+
 uint8_t pciread8(pcidevice dev, uint8_t regno) {
   uint32_t value = pciread32(dev, regno);
   return (value >> (8*(regno&3))) & 0xFF;
@@ -8,7 +11,7 @@ uint8_t pciread8(pcidevice dev, uint8_t regno) {
 
 uint16_t pciread16(pcidevice dev, uint8_t regno) {
   uint32_t value = pciread32(dev, regno);
-  return (value >> (8*(regno&2))) & 0xFF;
+  return (value >> (8*(regno&2))) & 0xFFFF;
 }
 
 uint32_t pciread32(pcidevice dev, uint8_t regno) {
@@ -39,26 +42,21 @@ void pciwrite32(pcidevice dev, uint8_t regno, uint32_t value) {
   outd(0xCFC, value);
 }
 
-void pci_detect(void (*onDevice)(pcidevice), uint8_t bus) {
+void pci_detect(PciDevice* (*onDevice)(pcidevice), uint8_t bus, PciBridge* rootdev) {
   for ( unsigned int slot = 0; slot < 32; slot++ )
   {
     unsigned int num_functions = 1;
     for ( unsigned int function = 0; function < num_functions; function++ )
     {
+      PciDevice* devobj = nullptr;
       pcidevice dev = (bus << 8) | (slot << 3) | function;
-
-      uint32_t vendor_device = pciread32(dev, 0);
-      if (vendor_device != 0 && vendor_device != 0xFFFFFFFF)
-        onDevice(dev);
 
       uint8_t header = pciread8(dev, 0x0E);
       if ( header & 0x80 )
         num_functions = 8;
-      if ( (header & 0x7F) == 0x01 )
-      {
-        uint8_t subbusid = pciread8(dev, 0x19);
-        pci_detect(onDevice, subbusid);
-      }
+      uint32_t vendor_device = pciread32(dev, 0);
+      if (vendor_device != 0 && vendor_device != 0xFFFFFFFF)
+        rootdev->AddDevice(dev, onDevice(dev));
     }
   }
 }

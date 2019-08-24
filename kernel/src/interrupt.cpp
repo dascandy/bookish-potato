@@ -44,7 +44,7 @@ struct tss {
   uint16_t reserve4;
   char iobitmap[1];
 } __attribute__ ((packed));
-static tss _tss;
+static tss _tss = {};
 
 void tss_set_ist(IST ist, void* stackptr) {
   _tss.ist[(uint8_t)ist] = stackptr;
@@ -97,7 +97,6 @@ static void disable_pic() {
 void interrupt_init() {
   disable_pic();
   
-  memset(&_tss, 0, sizeof(_tss));
   debug("stack for ist = {}\n", (void*)stack_for_interrupts);
   debug("tss = {}\n", &_tss);
   tss_set_ist(IST::Interrupt, stack_for_interrupts + sizeof(stack_for_interrupts));
@@ -139,7 +138,7 @@ void interrupt_init() {
   asm volatile ("lidt (%%rax)" :: "a"(&_loadidt));
   asm volatile ("lgdt (%%rax)" :: "a"(&_loadgdt));
   asm volatile ("ltr %%ax\n" :: "a"(0x20));
-  Apic::init();
+//  Apic::init();
 }
 
 void platform_eoi() {
