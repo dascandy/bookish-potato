@@ -1,5 +1,9 @@
 #pragma once
 
-uint64_t get_free_page();
+#include <cstddef>
+#include <cstdint>
+
+uint64_t freepage_get();
+void freepage_add_region(uint64_t start, size_t length);
 
 

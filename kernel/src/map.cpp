@@ -84,6 +84,9 @@ void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use) {
   switch(use) {
   case DeviceRegisters:
   case DeviceMemory:
+    entries[t].pcd = 1;
+    entries[t].pwt = 1;
+    break;
   case ReadWriteMemory:
     break;
   case ReadOnlyMemory:

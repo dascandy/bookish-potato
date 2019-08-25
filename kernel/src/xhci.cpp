@@ -66,7 +66,6 @@ struct xhci_speed {
   uint8_t spd_exponent;
   uint16_t spd_mantissa;
   uint8_t linkprot = 0;
-  uint8_t symmetric = 0;
   uint8_t slottype = 0;
 };
 

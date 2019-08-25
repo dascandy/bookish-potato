@@ -11,7 +11,7 @@ struct free_page_list {
 
 static free_page_list* head = nullptr;
 
-uint64_t get_free_page() {
+uint64_t freepage_get() {
   free_page_list* c = head;
   uint64_t page = c->address;
   c->address += 4096;
@@ -23,7 +23,7 @@ uint64_t get_free_page() {
   return page;
 }
 
-void malloc_add_region(uint64_t start, size_t length) {
+void freepage_add_region(uint64_t start, size_t length) {
   free_page_list* c = new free_page_list;
   length -= (4096 - (start & 0xFFF));
   start = (start + 4095) & ~((uint64_t)0xFFF);
