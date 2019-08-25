@@ -37,6 +37,7 @@ _start:
 .code32  
 _start:
   cli
+  movl %eax, %ebp
   // build paging tables
   xorl %eax, %eax
   movl $0x1000, %ecx
@@ -83,6 +84,8 @@ lm_entry:
     movw %ax, %ds
     movw %ax, %ss
     movq $0xa0000, %rsp
+    movq %rbx, %rdi
+    movq %rbp, %rsi
     jmp     kernel_entry
 
 .section ".multiboot"

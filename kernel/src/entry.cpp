@@ -7,6 +7,7 @@
 #include "pci.h"
 #include "nvme.h"
 #include "xhci.h"
+#include "freepage.h"
 
 const char* pci_caps[] = {
   "-",
@@ -124,7 +125,87 @@ PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid) {
   return bridge;
 }
 
-void platform_init() {
+struct mb1 {
+  uint32_t flags;
+  uint32_t memlower;
+  uint32_t memhigher;
+  uint32_t bootdevice;
+  uint32_t cmdline;
+  uint32_t mods_count;
+  uint32_t mods_addr;
+  uint32_t sym_num;
+  uint32_t sym_size;
+  uint32_t sym_addr;
+  uint32_t sym_shndx;
+  uint32_t mmap_length;
+  uint32_t mmap_addr;
+  uint32_t drives_length;
+  uint32_t drives_addr;
+  uint32_t config_table;
+  uint32_t boot_loader_name;
+  uint32_t apm_table;
+  // legacy graphics stuff below, don't care
+};
+
+struct mb1_memory {
+  uint64_t base_addr;
+  uint64_t length;
+  uint32_t type;
+};
+
+void mb1_init(mb1* data) {
+  if (data->flags & 0x40) {
+    debug("MB1 has memory map\n");
+    debug("{x} {x}\n", data->mmap_addr, data->mmap_length);
+    size_t stride = *(uint32_t*)((uintptr_t)data->mmap_addr );
+    debug("{} stride\n", stride);
+    if (stride < 20) stride = 24;
+    size_t count = data->mmap_length / stride;
+    for(size_t n = 0; n < count; n++) {
+      mb1_memory* m = (mb1_memory*)((uintptr_t)data->mmap_addr + 4 + n * (stride + 4));
+      debug("{x} {x} {}\n", m->base_addr, m->length, m->type);
+      if (m->type == 1) {
+        uintptr_t start = m->base_addr;
+        size_t length = m->length;
+        if ((start & 0xFFF) != 0) {
+          size_t toskip = 0x1000 - (start & 0xFFF);
+          start += toskip;
+          length -= toskip;
+        }
+        if (length & 0xFFF) length -= (length & 0xFFF);
+        debug("{x} {x}\n", start, length);
+        freepage_add_region(m->base_addr, m->length);
+      }
+    }
+  }
+}
+
+struct mb2_entry {
+  uint32_t type;
+  uint32_t size;
+};
+
+struct mb2 {
+  uint32_t total_size;
+  uint32_t reserved;
+};
+
+void mb2_init(mb2* data) {
+  mb2_entry* entry = (mb2_entry*)((char*)data + 8);
+  while (entry->type != 0) {
+    debug("MB2 {} {}\n", entry->type, entry->size);
+    entry = (mb2_entry*)((char*)entry + entry->size);
+  }
+}
+
+void platform_init(void* platform_data, uint32_t magic) {
+  if (magic == 0x2badb002) {
+    mb1_init((mb1*)platform_data);
+  } else if (magic == 0x36d76289) {
+    mb2_init((mb2*)platform_data);
+  } else {
+    debug("No MB data found, continuing without. This is broken, fyi.\n");
+  }
   acpi_init();
   pci_handle_bridge(0, 0);
 }
@@ -133,10 +214,11 @@ extern "C" void kernel_secondary_cpu() {
   while (1) {}
 }
 
-extern "C" void kernel_entry() {
+extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   debug_init();
+  debug("magic is {x}\n", magic);
+  platform_init(platform_data, magic);
   interrupt_init();
-  platform_init();
   while(1) {}
 }
 

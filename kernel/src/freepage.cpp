@@ -13,8 +13,7 @@ static free_page_list* head = nullptr;
 
 uint64_t freepage_get() {
   free_page_list* c = head;
-  uint64_t page = c->address;
-  c->address += 4096;
+  uint64_t page = c->address + 4096 * c->pagecount;
   c->pagecount--;
   if (!c->pagecount) {
     head = c->next;

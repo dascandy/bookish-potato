@@ -31,7 +31,7 @@ void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use) {
   t &= 0x1FF;
 
   if (entries[t].p == 0) {
-    entries[t].addr = get_free_page() >> 12;
+    entries[t].addr = freepage_get() >> 12;
     entries[t].p = 1;
     entries[t].rw = 1;
     entries[t].us = 1;
@@ -45,7 +45,7 @@ void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use) {
   t &= 0x3FFFF;
 
   if (entries[t].p == 0) {
-    entries[t].addr = get_free_page() >> 12;
+    entries[t].addr = freepage_get() >> 12;
     entries[t].p = 1;
     entries[t].rw = 1;
     entries[t].us = 1;
@@ -59,7 +59,7 @@ void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use) {
   t &= 0x7FFFFFF;
 
   if (entries[t].p == 0) {
-    entries[t].addr = get_free_page() >> 12;
+    entries[t].addr = freepage_get() >> 12;
     entries[t].p = 1;
     entries[t].rw = 1;
     entries[t].us = 1;
