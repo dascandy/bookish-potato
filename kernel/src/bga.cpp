@@ -1,7 +1,7 @@
 #include "bga.h"
 #include "io.h"
 #include "pci.h"
-#include "platform.h"
+#include "map.h"
 
 enum BgaReg {
   Id,

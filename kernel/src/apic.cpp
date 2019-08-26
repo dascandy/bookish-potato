@@ -1,6 +1,6 @@
 #include "apic.h"
 #include "io.h"
-#include "platform.h"
+#include "map.h"
 
 namespace Apic 
 {

@@ -44,13 +44,18 @@ _start:
   movl %ecx, %edi
   rep stosl
 
-  // Identity-map the first 4G using 1G pages
+  // Identity-map the first 16M with 2M pages
   movl $0x1007, %es:0x1ff8
   movl $0x2007, %es:0x1000
-  movl $0x00000087, %es:0x2000
-  movl $0x40000087, %es:0x2008
-  movl $0x80000087, %es:0x2010
-  movl $0xc0000087, %es:0x2018
+  movl $0x3007, %es:0x2000
+  movl $0x00000087, %es:0x3000
+  movl $0x00200087, %es:0x3008
+  movl $0x00400087, %es:0x3010
+  movl $0x00600087, %es:0x3018
+  movl $0x00800087, %es:0x3020
+  movl $0x00a00087, %es:0x3028
+  movl $0x00c00087, %es:0x3030
+  movl $0x00e00087, %es:0x3038
 
   // Trigger switch to LM directly
   lgdt (gdt64_load)

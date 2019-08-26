@@ -1,5 +1,5 @@
 #include "interrupt.h"
-#include "platform.h"
+#include "map.h"
 #include <cstdint>
 #include "crash.h"
 #include "io.h"

@@ -1,6 +1,7 @@
-#include "platform.h"
 #include <string.h>
 #include "freepage.h"
+#include "map.h"
+#include "asa.h"
 
 struct pte {
         uint64_t p:1;
@@ -137,6 +138,31 @@ uint64_t platform_unmap(void* addr) {
   entries[t].p = 0;
   invlpg(addr);
   return p;
+}
+
+mapping::mapping(uintptr_t address, size_t bytes, MappingUse use) 
+: bytecount(bytes)
+, virtaddr(asa_alloc(bytes))
+, offset(address & 0xFFF)
+{
+  if (offset) {
+    bytes += 0x1000;
+    address -= address & 0xFFF;
+  }
+  for (size_t n = 0; n < bytecount; n += 4096) {
+    platform_map((void*)(virtaddr + n), address + n, use);
+  }
+}
+
+mapping::~mapping() {
+  for (size_t n = 0; n < bytecount; n += 4096) {
+    platform_unmap((void*)(virtaddr + n));
+  }
+  asa_free(virtaddr, bytecount);
+}
+
+void* mapping::get() {
+  return reinterpret_cast<void*>(virtaddr + offset);
 }
 
 

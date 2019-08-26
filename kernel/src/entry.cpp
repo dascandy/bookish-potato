@@ -8,6 +8,7 @@
 #include "nvme.h"
 #include "xhci.h"
 #include "freepage.h"
+#include "asa.h"
 
 const char* pci_caps[] = {
   "-",
@@ -215,10 +216,11 @@ extern "C" void kernel_secondary_cpu() {
 }
 
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
+  interrupt_init();
   debug_init();
   debug("magic is {x}\n", magic);
+  asa_init();
   platform_init(platform_data, magic);
-  interrupt_init();
   while(1) {}
 }
 
