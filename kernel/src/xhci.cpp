@@ -2,6 +2,7 @@
 #include "pci.h"
 #include "debug.h"
 #include "io.h"
+#include "map.h"
 
 constexpr uint64_t CR_CAPLENGTH = 0;
 constexpr uint64_t CR_HCIVERSION = 2;
@@ -111,10 +112,12 @@ XhciDevice::XhciDevice(pcidevice dev)
   uint64_t ptr = (((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF8ULL;
   debug("xhci for version {}.{} found at {x}\n", major, minor, ptr);
 
-  cr = ptr;
-  uint64_t opregs = ptr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
-  rr = ptr + mmio_read<uint32_t>(cr + CR_RTSOFF);
-  doorbell = ptr + mmio_read<uint32_t>(cr + CR_DBOFF);
+  mapping bar1(ptr, 0x10000, DeviceRegisters);
+
+  cr = (uintptr_t)bar1.get();
+  uint64_t opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
+  rr = cr + mmio_read<uint32_t>(cr + CR_RTSOFF);
+  doorbell = cr + mmio_read<uint32_t>(cr + CR_DBOFF);
 
   uint32_t hcsparams1 = mmio_read<uint32_t>(cr + CR_HCSPARAMS1);
   uint32_t maxports = (hcsparams1 >> 24) & 0xFF;
