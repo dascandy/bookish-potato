@@ -3,6 +3,8 @@
 #include "debug.h"
 #include "io.h"
 #include "map.h"
+#include <cstring>
+#include "freepage.h"
 
 constexpr uint64_t CR_CAPLENGTH = 0;
 constexpr uint64_t CR_HCIVERSION = 2;
@@ -104,6 +106,23 @@ void extractPsids(pcidevice dev) {
 
 }
 
+uint64_t XhciDevice::CreateContext(uint32_t scratchcount) {
+  uint64_t page = freepage_get();
+  mapping dcb(page, 0x1000, DeviceMemory);
+  memset(dcb.get(), 0, 0x1000);
+
+  uint64_t scratchpad_index = freepage_get();
+  mmio_write<uint64_t>((uintptr_t)dcb.get(), scratchpad_index);
+
+  mapping index(scratchpad_index, 0x1000, DeviceMemory);
+  memset(index.get(), 0, 0x1000);
+  uint64_t* scratchpads = (uint64_t*)index.get();
+  for (size_t n = 0; n < scratchcount; n++) {
+    scratchpads[n] = freepage_get_zeroed();
+  }
+  return page;
+}
+
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
 {
@@ -137,11 +156,6 @@ XhciDevice::XhciDevice(pcidevice dev)
   }
   pciwrite16(dev, 0x04, pciread16(dev, 0x04) | 6);
 
-/*
-  hc_constructRootPorts(&x->hc, BYTE4(x->CapRegs->hcsparams1), &USB_XHCI);
-  printf("\nx->hc.rootPortCount: %u", x->hc.rootPortCount);
-*/
-
   mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) & ~RT_USBCMD_RUN);
   while ((mmio_read<uint32_t>(opregs + RT_USBSTS) & RT_USBSTS_HCH) == 0) {}
 
@@ -149,7 +163,6 @@ XhciDevice::XhciDevice(pcidevice dev)
   // TODO: sleep(1us)
   while ((mmio_read<uint32_t>(opregs + RT_USBCMD) & RT_USBCMD_RESET) != 0) {}
 
-  mmio_write<uint32_t>(opregs + RT_CONFIG, mmio_read<uint32_t>(opregs + RT_CONFIG) | maxslots);
 
   for (size_t n = 0; n < maxports; n++) {
     uint32_t sc = mmio_read<uint32_t>(opregs + 0x400 + n * 16 + P_SC);
@@ -161,122 +174,80 @@ XhciDevice::XhciDevice(pcidevice dev)
     debug("port {} {8x} {8x} {8x}\n", n, sc, pmsc, li);
   }
 
+  mmio_write<uint32_t>(opregs + RT_DNCTRL, 0x02);
+
+  uint32_t hcsparams2 = mmio_read<uint32_t>(cr + CR_HCSPARAMS2);
+  uint32_t scratchcount = ((hcsparams2 >> 27) & 0x1F) | ((hcsparams2 >> 16) & 0x3E0);
+  if (scratchcount > 512)
+    debug("XHCI: requires more scratchpads than fit the index?\n");
+  uint64_t dcbPage = CreateContext(scratchcount);
+  mmio_write<uint64_t>(opregs + RT_DCBAAP, dcbPage);
+  mmio_write<uint32_t>(opregs + RT_CONFIG, mmio_read<uint32_t>(opregs + RT_CONFIG) | maxslots);
+
+  uint64_t cr_page = freepage_get_zeroed();
+  mapping cr(cr_page, 0x1000, DeviceMemory); // or registers?
+  
+  uint64_t primaryEventRing = freepage_get_zeroed();
+  mapping pev(primaryEventRing, 0x1000, DeviceMemory);
+
+  mmio_write<uint64_t>(opregs + RT_CRCR, cr_page + 1);
+
+  uint64_t evtSeg = freepage_get_zeroed();
+  mapping pev(evtSeg, 0x1000, DeviceMemory);
+
+
+  uint64_t primaryEventRing = freepage_get_zeroed();
+  mapping pev(primaryEventRing, 0x1000, DeviceMemory);
+
+  paddr_t evtseg = pmmngr_allocate(1);
+  void* evtringseg = find_free_paging(PAGESIZE);
+  paging_map(evtringseg, evtseg, PAGESIZE, PAGE_ATTRIBUTE_WRITABLE | PAGE_ATTRIBUTE_NO_CACHING);
+  memset(evtringseg, 0, PAGESIZE);
+  //Create one event ring segment
+  paddr_t evt = pmmngr_allocate(1);
+  void* evtring = find_free_paging(PAGESIZE);
+  void* evtdp = evtring;
+  paging_map(evtring, evt, PAGESIZE, PAGE_ATTRIBUTE_WRITABLE | PAGE_ATTRIBUTE_NO_CACHING);
+  memset(evtring, 0, PAGESIZE);
+  //Write it to the segment table
+  *raw_offset<volatile uint64_t*>(evtringseg, 0) = evt;
+  *raw_offset<volatile uint64_t*>(evtringseg, 8) = PAGESIZE / 0x10;
+  //Write the event ring info
+  primaryevt.dequeueptr = evtdp;
+  primaryevt.ringbase = evtring;
+  //Set segment table size
+  Runtime.Interrupter(0).ERSTSZ.Size = 1;
+  //Set dequeue pointer
+  Runtime.Interrupter(0).ERDP.update(evt, false);
+  //Enable event ring
+  Runtime.Interrupter(0).ERSTBA.SegTableBase = evtseg;
+  Runtime.Interrupter(0).IMAN = Runtime.Interrupter(0).IMAN;
+
+
+  mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) | RT_USBCMD_RUN);
+
+    /*
+		Runtime.Interrupter(0).IMAN.InterruptEnable = 1;
+		Operational.USBCMD.INTE = 1;
+		//Just make sure we don't miss interrupts
+		Runtime.Interrupter(0).IMAN = Runtime.Interrupter(0).IMAN;
+		Runtime.Interrupter(0).IMOD.InterruptInterval = 4000;
+		Operational.USBSTS = Operational.USBSTS;
+		//Work on ports
+		kprintf(u"XHCI controller enabled, %d ports\n", getMaxPorts());
+		for (size_t n = 1; n <= getMaxPorts(); ++n)
+		{
+			xhci_thread_port_startup* sup = new xhci_thread_port_startup;
+			sup->cinfo = this;
+			sup->port = n;
+			//create_thread(&xhci_port_startup, sup);
+			xhci_port_startup(sup);
+		}
+    */
 /*
-  deactivateLegacySupport(x);
-
-  x->OpRegs->devnotifctrl = 0x2;
-
-  // Program the Device Context Base Address Array Pointer (DCBAAP) register (5.4.6) with a 64-bit address pointing to where the Device Context Base Address Array is located.
-  x->virt_deviceContextPointerArrayBase = malloc(sizeof(xhci_DeviceContextArray_t), 64 | HEAP_CONTINUOUS, "xhci_DevContextArray"); // Heap is contiguous below 4K. Alignment see Table 54
-  x->OpRegs->dcbaap = (uint64_t)paging_getPhysAddr(x->virt_deviceContextPointerArrayBase);
-
-  uint8_t MaxScratchpadBuffers = ((x->CapRegs->hcsparams2 >> 27) & 0x1F) | ((x->CapRegs->hcsparams2 >> 16) & 0xE0);
-  if (MaxScratchpadBuffers > 0) // Max Scratchpad Buffers
-  {
-    printf("\nscratchpad buffer created! Max Scratchpad Buffers = %u", MaxScratchpadBuffers);
-    uint64_t* ScratchpadBuffersPtr = malloc(sizeof(uint64_t)*MaxScratchpadBuffers, 64 | HEAP_CONTINUOUS, "xhci_ScratchpadBuffersPtr");
-    for (uint8_t i=0; i<MaxScratchpadBuffers; i++)
-    {
-      ScratchpadBuffersPtr[i] = paging_getPhysAddr(malloc(PAGESIZE, PAGESIZE | HEAP_CONTINUOUS, "xhci_ScratchpadBuffer"));
-    }
-    x->virt_deviceContextPointerArrayBase->scratchpadBufferArrBase = (uint64_t)paging_getPhysAddr(ScratchpadBuffersPtr); // Ptr to scratchpad buffer array
-  }
-  else // Max Scratchpad Buffers = 0
-  {
-    x->virt_deviceContextPointerArrayBase->scratchpadBufferArrBase = 0;
-  }
-
-  // Device Contexts
-  for (uint16_t i=0; i<MAX_HC_SLOTS; i++)
-  {
-    x->devContextPtr[i] = malloc(sizeof(xhci_DeviceContext_t), 64 | HEAP_CONTINUOUS, "xhci_DevContext"); // Alignment see Table 54
-    memset(x->devContextPtr[i], 0, sizeof(xhci_DeviceContext_t));
-    x->virt_deviceContextPointerArrayBase->devContextPtr[i] = (uintptr_t)paging_getPhysAddr(x->devContextPtr[i]);
-  }
-
-  // Input Device Contexts
-  for (uint16_t i=0; i<MAX_HC_SLOTS; i++)
-  {
-    x->devInputContextPtr[i] = malloc(sizeof(xhci_InputContext_t), 64 | HEAP_CONTINUOUS, "xhci_DevInputContext"); // Alignment see Table 54
-    memset(x->devInputContextPtr[i], 0, sizeof(xhci_InputContext_t));
-  }
-
-  // Transfer Rings
-  for (uint16_t slotNr=1; slotNr<=MAX_HC_SLOTS; slotNr++)
-  {
-    x->slots[slotNr-1] = malloc(sizeof(xhci_slot_t), 0, "xhci_slots");
-
-    for (uint16_t i=0; i<NUM_ENDPOINTS; i++)
-    {
-      xhci_xfer_NormalTRB_t* trb = malloc(256*sizeof(xhci_xfer_NormalTRB_t), PAGESIZE | HEAP_CONTINUOUS, "xhci_transferTRB"); // Alignment see Table 54. Use PAGESIZE to ensure that the memory is within one page.
-      memset(trb, 0, 256 * sizeof(xhci_xfer_NormalTRB_t));
-      x->trb[slotNr-1][i] = trb;
-
-      // Software uses and maintains private copies of the Enqueue and Dequeue Pointers for each Transfer Ring.
-      x->slots[slotNr-1]->endpoints[i].virtEnqTransferRingPtr = x->slots[slotNr-1]->endpoints[i].virtDeqTransferRingPtr = trb;
-      x->slots[slotNr-1]->endpoints[i].TransferRingProducerCycleState = true; // PCS
-      x->slots[slotNr-1]->endpoints[i].TransferCounter = 0; // Reset Transfer Counter
-      x->slots[slotNr-1]->endpoints[i].timeEvent = 0;
-      x->slots[slotNr-1]->endpoints[i].TransferRingbase = trb;
-
-      // LinkTRB
-      xhci_LinkTRB_t* linkTrb = (xhci_LinkTRB_t*)(trb + 255);
-      linkTrb->RingSegmentPtrLo = paging_getPhysAddr(trb); // segment pointer
-      linkTrb->IntTarget = 0;                // intr target
-      linkTrb->TC = 1;                   // Toggle Cycle !! 4.11.5.1 Link TRB
-      linkTrb->TRBtype = TRB_TYPE_LINK;          // ID of link TRB, cf. table 131
-    }
-  }
-
-  // Command Ring
-  // Define the Command Ring Dequeue Pointer by programming the Command Ring Control Register (5.4.5) with a 64-bit address pointing to the starting address of the first TRB of the Command Ring.
-  x->CmdRingbase = malloc(256*sizeof(xhci_LinkTRB_t), 64 | HEAP_CONTINUOUS, "xhci_cmdTRB"); // Alignment see Table 54
-  x->virtEnqCmdRingPtr = x->CmdRingbase;
-  memset(x->CmdRingbase, 0, 256*sizeof(xhci_LinkTRB_t));
-
-  // LinkTRB
-  x->CmdRingbase[255].RingSegmentPtrLo = paging_getPhysAddr(x->CmdRingbase); // segment pointer
-  x->CmdRingbase[255].TC = 1;                        // Toggle Cycle
-  x->CmdRingbase[255].TRBtype = TRB_TYPE_LINK;                 // ID of link TRB, cf. table 131
-
-  // Command Ring Control Register (5.4.5), "crcr"
-  x->CmdRingProducerCycleState = true; // PCS
-  x->OpRegs->crcr = paging_getPhysAddr(x->CmdRingbase) | x->CmdRingProducerCycleState; // command ring control register, Table 32, 5.4.5, CCS is Bit 0. Bit5:4 are RsvdP, but cannot be read.
-
-  xhci_configureInterrupts(x);
-  xhci_prepareEventRing(x);
-
   // Write the USBCMD (5.4.1) to turn the host controller ON via setting the Run/Stop (R/S) bit to ���� This operation allows the xHC to begin accepting doorbell references.
   x->OpRegs->command |= CMD_RUN; // set Run/Stop bit
   sleepMilliSeconds(100); //  IMPORTANT
-
-  xhci_showStatus(x);
-
-  if (!(x->OpRegs->status & STS_HCH)) // HC not Halted
-  {
-    xhci_prepareSlotsForControlTransfers(x);
-  }
-  else // HC Halted
-  {
-    printfe("\nFatal Error: HCHalted set. Ports cannot be enabled.");
-    xhci_showStatus(x);
-  }
-}
-
-
-
-
-
-static void xhci_configureInterrupts(xhci_t* x)
-{
-    // MSI (We do not support MSI-X)
-    x->msiCapEnabled = pci_trySetMSIVector(x->PCIdevice, APICIRQ);
-
-    if (x->msiCapEnabled)
-        x->irq = APICIRQ;
-    else
-        x->irq = x->PCIdevice->irq;
-    irq_installPCIHandler(x->irq, xhci_handler, x->PCIdevice);
 */
 }
 

@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include "map.h"
 
 struct free_page_list {
   uint64_t address;
@@ -30,6 +31,13 @@ void freepage_add_region(uint64_t start, size_t length) {
   c->pagecount = length / 4096;
   c->next = head;
   head = c;
+}
+
+uint64_t freepage_get_zeroed() {
+  uint64_t freepage = freepage_get();
+  mapping m(freepage, 0x1000, DeviceMemory); // Using device memory to make sure the writes are not cached
+  memset(m.get(), 0, 0x1000);
+  return freepage;
 }
 
 
