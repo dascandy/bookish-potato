@@ -128,6 +128,10 @@ uint64_t XhciDevice::CreateContext(uint32_t scratchcount) {
   return page;
 }
 
+static xhci_command create_enableslot_command(uint8_t slottype) {
+  return { 0, XHCI_TRB_ENABLED | XHCI_TRB_TYPE(XHCI_TRB_TYPE_ENABLE_SLOT) | (slottype << 16) };
+}
+
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
 {
@@ -139,7 +143,7 @@ XhciDevice::XhciDevice(pcidevice dev)
   mapping bar1(ptr, 0x10000, DeviceRegisters);
 
   cr = (uintptr_t)bar1.get();
-  uint64_t opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
+  opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
   rr = cr + mmio_read<uint32_t>(cr + CR_RTSOFF);
   doorbell = cr + mmio_read<uint32_t>(cr + CR_DBOFF);
 
@@ -214,86 +218,98 @@ XhciDevice::XhciDevice(pcidevice dev)
 */
   //Work on ports
   debug("XHCI controller enabled, {} ports\n", maxports);
-  for (size_t n = 1; n <= maxports; ++n)
+  for (size_t n = 0; n < maxports; ++n)
   {
-    port_startup(n);
+    uint64_t or_port = opregs + 0x400 + n*16;
+    uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
+    if (sc & 1) {
+      devices[n] = new XhciUsbDevice(host, n);
+      devices[n]->startup();
+      port_startup(n);
+    }
   }
 }
 
-void port_startup(size_t n) 
-{
-  XhciPortRegisterBlock portregs = Operational.Port(n);
-  uint32_t sc = mmio_read<uint32_t>(opregs + 0x3F0 + n * 16 + P_SC);
-  uint32_t pmsc = mmio_read<uint32_t>(opregs + 0x3F0 + n * 16 + P_PMSC);
-  uint32_t li = mmio_read<uint32_t>(opregs + 0x3F0 + n * 16 + P_LI);
-  if (sc & 1)
-  {
-    mmio_write<uint32_t>(opregs + 0x3F0 + n*16 + P_SC, 0x10);
-    while (mmio_read<uint32_t>(opregs + 0x3F0 + n*16 + P_SC) & 0x10) {}
+struct UsbDevice {
+  UsbHost& host;
+  uint8_t deviceId;
+  char descriptors[256];
+  char buffer[1024];
+};
 
-    void* last_command = nullptr;
-    last_command = cmdring.enqueue(create_enableslot_command(protocol_speeds[portspeed].slottype));
-    //Now get a command completion event from the event ring
-    uint64_t* curevt = (uint64_t*)waitComplete(last_command, 1000);
-    if (get_trb_completion_code(curevt) != XHCI_COMPLETION_SUCCESS)
-    {
-      kprintf(u"Error enabling slot!\n");
-      return;
-    }
-    uint8_t slotid = curevt[1] >> 56;
-    if (slotid == 0)
-      return;
-    //kprintf(u"  DSE command complete: %d\n", slotid);
-    xhci_port_info* port_info = new xhci_port_info(this, slotid);
-    port_info->controller = cinfo;
-    port_info->portindex = n;
-    port_info->slotid = slotid;
-    if (!createSlotContext(portspeed, port_info))
-      return;
-    //Now we get device descriptor
-    xhci_command** devcmds = new xhci_command*[4];
-    devcmds[0] = create_setup_stage_trb(0x80, 6, 0x100, 0, 20, 3);
-    volatile usb_device_descriptor* devdesc = (usb_device_descriptor*)new uint8_t[64];
-    devcmds[1] = create_data_stage_trb(get_physical_address((void*)devdesc), 20, true);
+  UsbDeviceState state = New;
+
+UsbDevice::UsbDevice() 
+{
+  uint32_t pmsc = mmio_read<uint32_t>(op_port + P_PMSC);
+  uint32_t li = mmio_read<uint32_t>(op_port + P_LI);
+  uint64_t or_port = opregs + 0x400 + n*16;
+  mmio_write<uint32_t>(opregs + 0x3F0 + n*16 + P_SC, 0x10);
+  while (mmio_read<uint32_t>(opregs + 0x3F0 + n*16 + P_SC) & 0x10) {}
+
+  void* last_command = nullptr;
+  last_command = cmdring.enqueue(create_enableslot_command(protocol_speeds[portspeed].slottype));
+
+  //Now get a command completion event from the event ring
+  uint64_t* curevt = (uint64_t*)waitComplete(last_command, 1000);
+  uint8_t slotid = curevt[1] >> 56;
+  if (get_trb_completion_code(curevt) != XHCI_COMPLETION_SUCCESS || slotid == 0) {
+    debug("Could not get a slot ID from xhci controller, turning off port");
+    state = Off;
+    return;
+  }
+
+  //kprintf(u"  DSE command complete: %d\n", slotid);
+  xhci_port_info* port_info = new xhci_port_info(this, slotid);
+  port_info->controller = cinfo;
+  port_info->portindex = n;
+  port_info->slotid = slotid;
+  if (!createSlotContext(portspeed, port_info))
+    return;
+
+  // set address first, then request descriptors
+  enqueue_command(create_setup_stage_trb(0x80, 6, 0x100, 0, 20, 3));
+  enqueue_command(create_data_stage_trb(get_physical_address((void*)descriptors), 20, true));
+  enqueue_command(create_status_stage_trb(true));
+  send_commands();
+  /*
+  void* statusevt = port_info->cmdring.enqueue_commands(devcmds);
+  void* resulttrb = waitComplete(statusevt, 1000);
+*/ // how?
+  if (get_trb_completion_code(resulttrb) != XHCI_COMPLETION_SUCCESS)
+  {
+    kprintf(u"Error getting device descriptor (code %d)\n", get_trb_completion_code(resulttrb));
+    return;
+  }
+  else 
+  {
+    kprintf_a("   Device %x:%x class %x:%x:%x USB version %x\n", devdesc->idVendor, devdesc->idProduct, devdesc->bDeviceClass, devdesc->bDeviceSublass, devdesc->bDeviceProtocol, devdesc->bcdUSB);
+  }
+  /*
+  if (devdesc->iManufacturer != 0)
+  {
+    //Get device string
+    devcmds[0] = create_setup_stage_trb(0x80, 6, 0x300 + devdesc->iManufacturer, 0, 256, 3);
+    volatile wchar_t* devstr = new wchar_t[256];
+    devcmds[1] = create_data_stage_trb(get_physical_address((void*)devstr), 256, true);
     devcmds[2] = create_status_stage_trb(true);
     devcmds[3] = nullptr;
-    port_info->cmdring.enqueue(devcmds[0]);
-    void* statusevt = port_info->cmdring.enqueue_commands(devcmds);
-    void* resulttrb = waitComplete(statusevt, 1000);
-    if (get_trb_completion_code(resulttrb) != XHCI_COMPLETION_SUCCESS)
-    {
-      kprintf(u"Error getting device descriptor (code %d)\n", get_trb_completion_code(resulttrb));
-      return;
-    }
-    if (devdesc->iManufacturer != 0)
-    {
-      //Get device string
-      devcmds[0] = create_setup_stage_trb(0x80, 6, 0x300 | devdesc->iManufacturer, 0, 256, 3);
-      volatile wchar_t* devstr = new wchar_t[256];
-      devcmds[1] = create_data_stage_trb(get_physical_address((void*)devstr), 256, true);
-      devcmds[2] = create_status_stage_trb(true);
-      devcmds[3] = nullptr;
-      statusevt = port_info->cmdring.enqueue_commands(devcmds);
-      resulttrb = waitComplete(statusevt, 1000);
-      kprintf(u"   Device vendor %s\n", ++devstr);
-    }
-    if (devdesc->iProduct != 0)
-    {
-      //Get device string
-      devcmds[0] = create_setup_stage_trb(0x80, 6, 0x300 | devdesc->iProduct, 0, 256, 3);
-      volatile wchar_t* devstr = new wchar_t[256];
-      devcmds[1] = create_data_stage_trb(get_physical_address((void*)devstr), 256, true);
-      devcmds[2] = create_status_stage_trb(true);
-      devcmds[3] = nullptr;
-      statusevt = port_info->cmdring.enqueue_commands(devcmds);
-      resulttrb = waitComplete(statusevt, 1000);
-      kprintf(u"   %s\n", ++devstr);
-    }
-    else
-    {
-      kprintf_a("   Device %x:%x class %x:%x:%x USB version %x\n", devdesc->idVendor, devdesc->idProduct, devdesc->bDeviceClass, devdesc->bDeviceSublass, devdesc->bDeviceProtocol, devdesc->bcdUSB);
-    }
-    //devdesc = raw_offset<volatile usb_device_descriptor*>(devdesc, 64);
+    statusevt = port_info->cmdring.enqueue_commands(devcmds);
+    resulttrb = waitComplete(statusevt, 1000);
+    kprintf(u"   Device vendor %s\n", ++devstr);
   }
+  if (devdesc->iProduct != 0)
+  {
+    //Get device string
+    devcmds[0] = create_setup_stage_trb(0x80, 6, 0x300 + devdesc->iProduct, 0, 256, 3);
+    volatile wchar_t* devstr = new wchar_t[256];
+    devcmds[1] = create_data_stage_trb(get_physical_address((void*)devstr), 256, true);
+    devcmds[2] = create_status_stage_trb(true);
+    devcmds[3] = nullptr;
+    statusevt = port_info->cmdring.enqueue_commands(devcmds);
+    resulttrb = waitComplete(statusevt, 1000);
+    kprintf(u"   %s\n", ++devstr);
+  }
+  */
 }
 
