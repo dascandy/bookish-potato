@@ -134,12 +134,9 @@ static xhci_command create_enableslot_command(uint8_t slottype) {
 
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
+, bar1(dev, 0)
 {
-  uint8_t version = pciread8(dev, 0x60);
-  uint8_t major = (version >> 4), minor = version & 0xF;
-  uint64_t ptr = (((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF8ULL;
-  debug("xhci for version {}.{} found at {x}\n", major, minor, ptr);
-
+  ptr -= (ptr & 0xF);
   mapping bar1(ptr, 0x10000, DeviceRegisters);
 
   cr = (uintptr_t)bar1.get();
@@ -151,18 +148,7 @@ XhciDevice::XhciDevice(pcidevice dev)
   uint32_t maxports = (hcsparams1 >> 24) & 0xFF;
   uint32_t maxinterrupters = (hcsparams1 >> 8) & 0x7FF;
   uint32_t maxslots = (hcsparams1 >> 0) & 0xFF;
-  debug("maxports{} maxints{} maxslots{}\n", maxports, maxinterrupters, maxslots);
 
-  uint32_t xecp = (mmio_read<uint32_t>(cr + CR_HCCPARAMS1) >> 16) << 2;
-
-  while (xecp) {
-    uint32_t hv = mmio_read<uint32_t>(cr + xecp);
-    uint8_t id = hv & 0xFF;
-    uint8_t ne = (hv >> 8) & 0xFF;
-    debug("id={}\n", id);
-    if (ne == 0) break;
-    xecp += ne * 4;
-  }
   pciwrite16(dev, 0x04, pciread16(dev, 0x04) | 6);
 
   mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) & ~RT_USBCMD_RUN);

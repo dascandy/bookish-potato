@@ -17,6 +17,7 @@ uint64_t platform_unmap(void* addr);
 
 struct mapping {
   mapping(uintptr_t address, size_t bytes, MappingUse use);
+  mapping(pcidevice dev, int barno);
   ~mapping();
   void* get();
   uintptr_t virtaddr;
