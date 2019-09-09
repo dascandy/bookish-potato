@@ -128,17 +128,19 @@ uint64_t XhciDevice::CreateContext(uint32_t scratchcount) {
   return page;
 }
 
+struct xhci_command {
+	uint64_t a, b;
+};
+
 static xhci_command create_enableslot_command(uint8_t slottype) {
-  return { 0, XHCI_TRB_ENABLED | XHCI_TRB_TYPE(XHCI_TRB_TYPE_ENABLE_SLOT) | (slottype << 16) };
+//  return { 0, XHCI_TRB_ENABLED | XHCI_TRB_TYPE(XHCI_TRB_TYPE_ENABLE_SLOT) | (slottype << 16) };
+	return {};
 }
 
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
 , bar1(dev, 0)
 {
-  ptr -= (ptr & 0xF);
-  mapping bar1(ptr, 0x10000, DeviceRegisters);
-
   cr = (uintptr_t)bar1.get();
   opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
   rr = cr + mmio_read<uint32_t>(cr + CR_RTSOFF);
@@ -206,36 +208,27 @@ XhciDevice::XhciDevice(pcidevice dev)
   debug("XHCI controller enabled, {} ports\n", maxports);
   for (size_t n = 0; n < maxports; ++n)
   {
-    uint64_t or_port = opregs + 0x400 + n*16;
+    uint64_t op_port = opregs + 0x400 + n*16;
     uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
     if (sc & 1) {
-      devices[n] = new XhciUsbDevice(host, n);
-      devices[n]->startup();
-      port_startup(n);
+      devices[n] = new XhciUsbDevice(this, n);
     }
   }
 }
 
-struct UsbDevice {
-  UsbHost& host;
-  uint8_t deviceId;
-  char descriptors[256];
-  char buffer[1024];
-};
-
-  UsbDeviceState state = New;
-
-UsbDevice::UsbDevice() 
+XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t id)
+       : host(host)
+ , slotId(id)
 {
+  uint64_t op_port = host->opregs + 0x400 + slotId*16;
   uint32_t pmsc = mmio_read<uint32_t>(op_port + P_PMSC);
   uint32_t li = mmio_read<uint32_t>(op_port + P_LI);
-  uint64_t or_port = opregs + 0x400 + n*16;
-  mmio_write<uint32_t>(opregs + 0x3F0 + n*16 + P_SC, 0x10);
-  while (mmio_read<uint32_t>(opregs + 0x3F0 + n*16 + P_SC) & 0x10) {}
+  mmio_write<uint32_t>(op_port + P_SC, 0x10);
+  while (mmio_read<uint32_t>(op_port + P_SC) & 0x10) {}
 
+/*
   void* last_command = nullptr;
   last_command = cmdring.enqueue(create_enableslot_command(protocol_speeds[portspeed].slottype));
-
   //Now get a command completion event from the event ring
   uint64_t* curevt = (uint64_t*)waitComplete(last_command, 1000);
   uint8_t slotid = curevt[1] >> 56;
@@ -258,20 +251,19 @@ UsbDevice::UsbDevice()
   enqueue_command(create_data_stage_trb(get_physical_address((void*)descriptors), 20, true));
   enqueue_command(create_status_stage_trb(true));
   send_commands();
-  /*
+*/
+/*
   void* statusevt = port_info->cmdring.enqueue_commands(devcmds);
   void* resulttrb = waitComplete(statusevt, 1000);
 */ // how?
-  if (get_trb_completion_code(resulttrb) != XHCI_COMPLETION_SUCCESS)
+/*  if (get_trb_completion_code(resulttrb) != XHCI_COMPLETION_SUCCESS)
   {
     kprintf(u"Error getting device descriptor (code %d)\n", get_trb_completion_code(resulttrb));
     return;
   }
-  else 
-  {
-    kprintf_a("   Device %x:%x class %x:%x:%x USB version %x\n", devdesc->idVendor, devdesc->idProduct, devdesc->bDeviceClass, devdesc->bDeviceSublass, devdesc->bDeviceProtocol, devdesc->bcdUSB);
-  }
-  /*
+  kprintf_a("   Device %x:%x class %x:%x:%x USB version %x\n", devdesc->idVendor, devdesc->idProduct, devdesc->bDeviceClass, devdesc->bDeviceSublass, devdesc->bDeviceProtocol, devdesc->bcdUSB);
+*/
+/*
   if (devdesc->iManufacturer != 0)
   {
     //Get device string

@@ -157,7 +157,7 @@ mapping::mapping(uintptr_t address, size_t bytes, MappingUse use)
 
 mapping::mapping(pcidevice dev, int barno) {
   uint64_t address = pciread32(dev, 0x10);
-  switch (value & 0x7) {
+  switch (address & 0x7) {
     case 0x0:
       // 32-bit
     case 0x2:
@@ -171,7 +171,7 @@ mapping::mapping(pcidevice dev, int barno) {
       address |= pciread32(dev, 0x14) << 32;
       pciwrite32(dev, 0x10, 0xFFFFFFFF);
       pciwrite32(dev, 0x14, 0xFFFFFFFF);
-      bytecount = ~((((uint64_t)pciread(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;
+      bytecount = ~((((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;
       pciwrite32(dev, 0x10, (uint32_t)address);
       pciwrite32(dev, 0x14, (uint32_t)(address >> 32));
       break;
@@ -183,11 +183,11 @@ mapping::mapping(pcidevice dev, int barno) {
   address -= (address & 0xF);
   offset = address & 0xFFF;
   if (offset) {
-    bytes += 0x1000;
+    bytecount += 0x1000;
     address -= address & 0xFFF;
   }
   for (size_t n = 0; n < bytecount; n += 4096) {
-    platform_map((void*)(virtaddr + n), address + n, use);
+    platform_map((void*)(virtaddr + n), address + n, DeviceRegisters);
   }
 }
 
