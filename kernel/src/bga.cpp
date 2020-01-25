@@ -3,6 +3,7 @@
 #include "pci.h"
 #include "map.h"
 
+#ifdef __x86_64__
 enum BgaReg {
   Id,
   XRes,
@@ -68,3 +69,5 @@ void platform_set_current_buffer(size_t buffer) {
   write_reg(YOffset, buffer*yres);
 }
 */
+#endif
+

@@ -2,6 +2,8 @@
 #include "io.h"
 #include "map.h"
 
+#ifdef __x86_64__
+
 namespace Apic 
 {
   enum APIC_MODE {
@@ -105,5 +107,7 @@ namespace Apic
 void x8664_endofinterrupt() {
   Apic::write(Apic::EOI, 0);
 }
+
+#endif
 
 

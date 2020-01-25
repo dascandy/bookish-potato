@@ -1,4 +1,4 @@
-
+#ifdef __x86_64__
 .section ".text.boot"
 
 .globl _Z20unhandled_interrupt_PK9registers
@@ -32,4 +32,5 @@ _Z19unhandled_interruptv:
     push %rax
     movq %rsp, %rdi
     jmp _Z20unhandled_interrupt_PK9registers
+#endif
 

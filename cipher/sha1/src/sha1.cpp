@@ -5,7 +5,7 @@
 #endif
 
 Cipher::Sha1::Sha1()
-: state({0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0})
+: state{0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0}
 {}
 
 void Cipher::Sha1::AddBlock(const uint8_t* data, size_t length) {

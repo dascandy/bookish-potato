@@ -20,9 +20,11 @@ struct pte {
         uint64_t nx:1;
 };
 
+#ifdef __x86_64__
 static inline void invlpg(void* x) {
   asm volatile ("invlpg (%0)"::"r"(x));
 }
+#endif
 
 void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use) {
   uint64_t t;
@@ -137,7 +139,9 @@ uint64_t platform_unmap(void* addr) {
   }
   uint64_t p = entries[t].addr << 12;
   entries[t].p = 0;
+#ifdef __x86_64__
   invlpg(addr);
+#endif
   return p;
 }
 
@@ -168,7 +172,7 @@ mapping::mapping(pcidevice dev, int barno) {
       break;
     case 0x4:
       // 64-bit
-      address |= pciread32(dev, 0x14) << 32;
+      address |= (uint64_t)pciread32(dev, 0x14) << 32;
       pciwrite32(dev, 0x10, 0xFFFFFFFF);
       pciwrite32(dev, 0x14, 0xFFFFFFFF);
       bytecount = ~((((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;

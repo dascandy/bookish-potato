@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#ifdef __x86_64__
+
 namespace Apic {
   enum {
     LocalAPIC_ID = 2,
@@ -35,6 +37,8 @@ namespace Apic {
   void write_ICR(uint64_t value);
   uint64_t read_ICR();
 }
+
+#endif
 
 #endif
 

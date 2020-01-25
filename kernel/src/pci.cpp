@@ -15,10 +15,15 @@ uint16_t pciread16(pcidevice dev, uint8_t regno) {
 }
 
 uint32_t pciread32(pcidevice dev, uint8_t regno) {
+#ifdef __x86_64__
   outd(0xCF8, 0x80000000 |            // enable
      (dev << 8) |    // function
      (regno & 0xFC));          // register
   return ind(0xCFC);
+#else
+  // TODO
+  return 0;
+#endif
 }
 
 void pciwrite8(pcidevice dev, uint8_t regno, uint8_t value) {
@@ -36,10 +41,14 @@ void pciwrite16(pcidevice dev, uint8_t regno, uint16_t value) {
 }
 
 void pciwrite32(pcidevice dev, uint8_t regno, uint32_t value) {
+#ifdef __x86_64__
   outd(0xCF8, 0x80000000 |
        (dev << 8) |
        (regno & 0xFC));
   outd(0xCFC, value);
+#else
+  // TODO
+#endif
 }
 
 void pci_detect(PciDevice* (*onDevice)(pcidevice), uint8_t bus, PciBridge* rootdev) {

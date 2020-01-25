@@ -3,6 +3,8 @@
 #include "pci.h"
 #include <cstddef>
 
+#ifdef __x86_64__
+
 class BgaFramebuffer {
 public:
   BgaFramebuffer(pcidevice dev);
@@ -14,5 +16,7 @@ private:
   size_t xres, yres, bufferId;
   uint32_t *buffer;
 };
+
+#endif
 
 

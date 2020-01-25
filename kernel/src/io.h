@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#ifdef __x86_64__
 inline uint8_t inb(uint16_t port) {
   uint8_t val;
   asm volatile ("inb %%dx, %%al"
@@ -58,6 +59,8 @@ inline void wrmsr(uint32_t msr, uint64_t value) {
            low = value;
   asm volatile ("wrmsr" :: "c"(msr), "a"(low), "d"(high));
 }
+
+#endif
 
 template <typename T>
 T mmio_read(uintptr_t address) {
