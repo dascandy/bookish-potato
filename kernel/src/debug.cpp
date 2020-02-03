@@ -2,16 +2,7 @@
 #include "io.h"
 #include <cstring>
 
-#ifdef __x86_64__
-void debug_init() { }
-
 static char hextab[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-
-void debug_field(std::string_view text, std::string_view spec) {
-  for (auto& c : text) {
-    outb(0xE9, c);
-  }
-}
 
 void debug_field(uint64_t value, std::string_view spec) {
   size_t pad = 0;
@@ -38,10 +29,9 @@ void debug_field(void* value, std::string_view spec) {
 }
 
 void debug_field(int64_t value, std::string_view spec) {
-  if (value < 0) outb(0xE9, '-');
+  if (value < 0) debug_field("-", "");
   debug_field((uint64_t)value, spec);
 }
 
-#endif
 
 

@@ -4,7 +4,7 @@ SECTIONS
 {
 	. = 1M;
  
-	.text BLOCK(4K) : ALIGN(4K)
+	.text : ALIGN(4096)
 	{
 		*(.multiboot)
 		*(.text.boot)
@@ -12,19 +12,20 @@ SECTIONS
 	}
  
 	/* Read-only data. */
-	.rodata BLOCK(4K) : ALIGN(4K)
+	.rodata : ALIGN(4096)
 	{
 		*(.rodata)
 	}
  
-	.data BLOCK(4K) : ALIGN(4K)
+	.data : ALIGN(4096)
 	{
 		*(.data)
 	}
- 
-	.bss BLOCK(4K) : ALIGN(4K)
+  __bss_start = .;
+	.bss : ALIGN(4096)
 	{
 		*(COMMON)
 		*(.bss)
 	}
+  __bss_size = . - __bss_start;
 }

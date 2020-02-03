@@ -1,6 +1,6 @@
 V Bootable on x86 qemu
 - SMP on x86
-- Memory management
+V Memory management
 - Interrupt handling on x86 qemu
 
 - Bootable on rpi4

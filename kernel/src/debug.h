@@ -6,6 +6,7 @@
 
 void debug_init();
 void debug_field(void* value, std::string_view spec);
+
 template <typename T>
 inline void debug_field(T* value, std::string_view spec) { debug_field((void*)value, spec); }
 void debug_field(uint64_t value, std::string_view spec);

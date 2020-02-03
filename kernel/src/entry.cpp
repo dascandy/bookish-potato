@@ -10,6 +10,7 @@
 #include "freepage.h"
 #include "asa.h"
 
+#ifdef __x86_64__
 const char* pci_caps[] = {
   "-",
   "pm",
@@ -210,6 +211,17 @@ void platform_init(void* platform_data, uint32_t magic) {
   acpi_init();
   pci_handle_bridge(0, 0);
 }
+#else
+
+void interrupt_init() {
+
+}
+
+void platform_init(void* platform_data, uint32_t magic) {
+
+}
+
+#endif
 
 extern "C" void kernel_secondary_cpu() {
   while (1) {}

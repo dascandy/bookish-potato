@@ -4,6 +4,7 @@
 #include "debug.h"
 #include "map.h"
 
+#ifdef __x86_64__
 struct ACPIHeader {
   char Signature[4];
   uint32_t Length;
@@ -102,4 +103,5 @@ void acpi_init() {
     check_rsd_ptr(start);
   }
 }
+#endif
 

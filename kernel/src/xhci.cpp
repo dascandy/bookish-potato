@@ -225,7 +225,6 @@ XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t id)
   uint32_t li = mmio_read<uint32_t>(op_port + P_LI);
   mmio_write<uint32_t>(op_port + P_SC, 0x10);
   while (mmio_read<uint32_t>(op_port + P_SC) & 0x10) {}
-
 /*
   void* last_command = nullptr;
   last_command = cmdring.enqueue(create_enableslot_command(protocol_speeds[portspeed].slottype));
@@ -251,7 +250,7 @@ XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t id)
   enqueue_command(create_data_stage_trb(get_physical_address((void*)descriptors), 20, true));
   enqueue_command(create_status_stage_trb(true));
   send_commands();
-*/
+  */
 /*
   void* statusevt = port_info->cmdring.enqueue_commands(devcmds);
   void* resulttrb = waitComplete(statusevt, 1000);
