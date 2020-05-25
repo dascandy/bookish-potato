@@ -90,8 +90,8 @@ lm_entry:
     .long 0xE4524FFB
 
 #else
-    .org 0x80000
 _start:
+/*
     // read cpu id
     mrs     x1, mpidr_el1
     and     x1, x1, #3    // 0-3
@@ -99,13 +99,18 @@ _start:
     add     x1, x1, #1    // 1-4
     lsl     x1, x1, #17   // 0x20000 - 0x80000
     mov     sp, x1
+*/
 
     // Re-read cpu id
     mrs     x1, mpidr_el1
     and     x1, x1, #3    // 0-3
     cbz     x1, 2f // Bounce off only the primary to entrypoint
-1:  b       kernel_secondary_cpu
-2:  // clear bss
+1:  wfe
+    b 1b
+// 1:  b       kernel_secondary_cpu
+2: 
+    ldr x1, =_start
+    mov sp, x1
     ldr     x1, =__bss_start
     ldr     w2, =__bss_size
 3:  cbz     w2, 4f
@@ -114,7 +119,8 @@ _start:
     cbnz    w2, 3b
  
 4:
-    b       kernel_entry
+    bl      kernel_entry
+    b 1b
 
 #endif
 

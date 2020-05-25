@@ -5,6 +5,7 @@
 #include <string_view>
 
 void debug_init();
+void debug_char(char c);
 void debug_field(void* value, std::string_view spec);
 
 template <typename T>

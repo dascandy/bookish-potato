@@ -1,37 +1,21 @@
 #include "mailbox.h"
+#include "io.h"
 
-struct mailbox_regs {
-  uint32_t read;
-  uint32_t pad[3];
-  uint32_t poll;
-  uint32_t sender;
-  uint32_t status;
-  uint32_t config;
-  uint32_t write;
-};
+#define MBOX_READ         0x3F00B880
+#define MBOX_READ_STATUS  0x3F00B898
+#define MBOX_WRITE        0x3F00B8A0
+#define MBOX_WRITE_STATUS 0x3F00B8B8
 
-static volatile mailbox_regs *regs = (mailbox_regs *)0x3F00B880;
+#define MBOX_FULL 0x80000000
+#define MBOX_EMPTY 0x40000000
 
 void mailbox_send(uint8_t port, uint32_t* ptr) {
-  while (regs->status & 0x80000000U) {}
-  regs->write = uint32_t(uintptr_t(ptr)) | port;
+  uint32_t value = ((uint32_t)(uintptr_t)(ptr) & 0xFFFFFFF0) | (port);
+  while (mmio_read<uint32_t>(MBOX_WRITE_STATUS) & MBOX_FULL) {}
+  mmio_write(MBOX_WRITE, value);
 
-  while ((regs->status & 0x40000000) == 0) {
-    uint32_t val = regs->read;
-    if ((uint8_t)(val & 0xF) == port) return;
-  }
+  while ((mmio_read<uint32_t>(MBOX_READ_STATUS) & MBOX_EMPTY) || mmio_read<uint32_t>(MBOX_READ) != value) {}
 }
-
-void mailbox_send(uint8_t port, uint32_t value) {
-  while (regs->status & 0x80000000U) {}
-  regs->write = value | port;
-
-  while ((regs->status & 0x40000000) == 0) {
-    uint32_t val = regs->read;
-    if ((uint8_t)(val & 0xF) == port) return;
-  }
-}
-
 
 
 

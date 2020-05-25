@@ -213,10 +213,6 @@ void platform_init(void* platform_data, uint32_t magic) {
 }
 #else
 
-void interrupt_init() {
-
-}
-
 void platform_init(void* platform_data, uint32_t magic) {
 
 }
@@ -228,11 +224,11 @@ extern "C" void kernel_secondary_cpu() {
 }
 
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
-  interrupt_init();
   debug_init();
   debug("magic is {x}\n", magic);
-  asa_init();
-  platform_init(platform_data, magic);
+  interrupt_init();
+//  asa_init();
+//  platform_init(platform_data, magic);
   while(1) {}
 }
 

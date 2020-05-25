@@ -1,0 +1,30 @@
+ENTRY(_start)
+ 
+SECTIONS
+{
+	. = 524288;
+ 
+	.text : ALIGN(4096)
+	{
+		*(.text.boot)
+		*(.text)
+	}
+ 
+	/* Read-only data. */
+	.rodata : ALIGN(4096)
+	{
+		*(.rodata)
+	}
+ 
+	.data : ALIGN(4096)
+	{
+		*(.data)
+	}
+  __bss_start = .;
+	.bss : ALIGN(4096)
+	{
+		*(COMMON)
+		*(.bss)
+	}
+  __bss_size = . - __bss_start;
+}

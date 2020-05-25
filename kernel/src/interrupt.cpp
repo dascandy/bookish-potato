@@ -155,6 +155,12 @@ void platform_disable_interrupts() {
   asm volatile ("cli");
 }
 
+#else
+
+void interrupt_init() {
+
+}
+
 #endif
 
 

@@ -60,6 +60,13 @@ inline void wrmsr(uint32_t msr, uint64_t value) {
   asm volatile ("wrmsr" :: "c"(msr), "a"(low), "d"(high));
 }
 
+#else
+
+inline void delay(unsigned int count) {
+  asm volatile("__delay_%=: nop; subs %[count], %[count], #1; bne __delay_%=\n"
+     : "=r"(count): [count]"0"(count) : "cc");
+}
+
 #endif
 
 template <typename T>
