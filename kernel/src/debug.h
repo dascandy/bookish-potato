@@ -4,20 +4,27 @@
 #include <cstddef>
 #include <string_view>
 
+#ifdef __x86_64__
 void debug_init();
+#else
+void debug_init(uintptr_t mmiobase);
+#endif
 void debug_char(char c);
 void debug_field(void* value, std::string_view spec);
 
-template <typename T>
-inline void debug_field(T* value, std::string_view spec) { debug_field((void*)value, spec); }
 void debug_field(uint64_t value, std::string_view spec);
 inline void debug_field(uint32_t value, std::string_view spec) { debug_field((uint64_t)value, spec); }
 inline void debug_field(uint16_t value, std::string_view spec) { debug_field((uint64_t)value, spec); }
 inline void debug_field(uint8_t value, std::string_view spec) { debug_field((uint64_t)value, spec); }
 void debug_field(int64_t value, std::string_view spec);
 void debug_field(std::string_view text, std::string_view spec = "");
-inline void debug_field(const char* value, std::string_view spec) {
-  debug_field(std::string_view(value), spec);
+template <typename T>
+inline void debug_field(T* value, std::string_view spec) { 
+  if (!spec.empty() && spec[0] == 's') {
+    debug_field(std::string_view(value), spec);
+  } else {
+    debug_field((void*)value, spec); 
+  }
 }
 
 inline void debug(std::string_view text) {

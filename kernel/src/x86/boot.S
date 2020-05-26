@@ -1,10 +1,6 @@
-// To keep this in the first portion of the binary.
-.section ".text.boot"
- 
-// Make _start global.
-.globl _start
-
 #ifdef __x86_64__
+.section ".text.boot"
+.globl _start
 .code32  
 _start:
   cli
@@ -88,40 +84,5 @@ lm_entry:
     .long 0x1BADB002
     .long 0x3
     .long 0xE4524FFB
-
-#else
-_start:
-/*
-    // read cpu id
-    mrs     x1, mpidr_el1
-    and     x1, x1, #3    // 0-3
-    // Set up stacks
-    add     x1, x1, #1    // 1-4
-    lsl     x1, x1, #17   // 0x20000 - 0x80000
-    mov     sp, x1
-*/
-
-    // Re-read cpu id
-    mrs     x1, mpidr_el1
-    and     x1, x1, #3    // 0-3
-    cbz     x1, 2f // Bounce off only the primary to entrypoint
-1:  wfe
-    b 1b
-// 1:  b       kernel_secondary_cpu
-2: 
-    ldr x1, =_start
-    mov sp, x1
-    ldr     x1, =__bss_start
-    ldr     w2, =__bss_size
-3:  cbz     w2, 4f
-    str     xzr, [x1], #8
-    sub     w2, w2, #1
-    cbnz    w2, 3b
- 
-4:
-    bl      kernel_entry
-    b 1b
-
 #endif
-
 

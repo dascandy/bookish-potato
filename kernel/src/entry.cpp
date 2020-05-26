@@ -201,6 +201,7 @@ void mb2_init(mb2* data) {
 }
 
 void platform_init(void* platform_data, uint32_t magic) {
+  interrupt_init();
   if (magic == 0x2badb002) {
     mb1_init((mb1*)platform_data);
   } else if (magic == 0x36d76289) {
@@ -212,9 +213,17 @@ void platform_init(void* platform_data, uint32_t magic) {
   pci_handle_bridge(0, 0);
 }
 #else
+#include "property_print.h"
+#include "rpi/model.h"
+#include "sd.h"
 
 void platform_init(void* platform_data, uint32_t magic) {
+  rpi_entry model = getModel();
+  debug_init(model.mmio_base);
+  debug("Found Raspberry Pi {s} (rev {s} with {}MB RAM, modelno {x} manufactured by {s}\n", model.modelname, model.revision, model.memory, model.modelno, model.manufacturer);
 
+  interrupt_init();
+  //sd_init(model.mmio_base + 0x00300000);
 }
 
 #endif
@@ -224,11 +233,8 @@ extern "C" void kernel_secondary_cpu() {
 }
 
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
-  debug_init();
-  debug("magic is {x}\n", magic);
-  interrupt_init();
+  platform_init(platform_data, magic);
 //  asa_init();
-//  platform_init(platform_data, magic);
   while(1) {}
 }
 
