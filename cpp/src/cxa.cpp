@@ -9,7 +9,7 @@ extern "C" void __cxa_guard_abort (__guard *);
 
 extern "C" int __cxa_guard_acquire (__guard *g) 
 {
-  return !*(char *)(g);
+  return 1;
 }
 
 extern "C" void __cxa_guard_release (__guard *g)

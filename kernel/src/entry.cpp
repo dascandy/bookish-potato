@@ -1,132 +1,19 @@
 #include <cstddef>
 #include <cstdint>
+#include <experimental/coroutine>
 #include "bookish_potato_version.h"
 #include "interrupt.h"
 #include "debug.h"
 #include "acpi.h"
 #include "pci.h"
-#include "nvme.h"
-#include "xhci.h"
+#include "future.h"
 #include "freepage.h"
 #include "asa.h"
+#include "event.h"
+#include "timer.h"
+#include "io.h"
 
 #ifdef __x86_64__
-const char* pci_caps[] = {
-  "-",
-  "pm",
-  "agp",
-  "vpd",
-  "slot",
-  "msi",
-  "cpci_hs",
-  "pci-x",
-  "ht",
-  "vendor",
-  "debug",
-  "ccrc",
-  "hotplug",
-  "subsys_vid",
-  "agp-br",
-  "inv-0xF",
-  "pci-ex",
-  "msi-x",
-  "inv-0x12",
-  "pciadv",
-};
-
-PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid);
-
-PciDevice* pci_find_driver(pcidevice dev, uint16_t vendor, uint16_t device, uint32_t devClass) {
-  // 0. if it's a bridge, make it a bridge
-  uint8_t header = pciread8(dev, 0x0E);
-  if ( (header & 0x7F) == 0x01 )
-  {
-    uint8_t subbusid = pciread8(dev, 0x19);
-    return pci_handle_bridge(dev, subbusid);
-  }
-
-  // 1. find match for vendor/device
-
-
-  // 2. find match for device class
-  if (devClass == 0x010802) {
-    return new NvmeDevice(dev);
-  } else if (devClass == 0x0c0330) {
-    return new XhciDevice(dev);
-  }
-
-  // 3. give up
-  return nullptr;
-}
-
-void pci_debug_print_device(uint16_t vendor, uint16_t device, uint32_t devClass) {
-  debug("found PCI vid={4x}", vendor);
-  if (vendor == 0x8086) debug("(intel)");
-  else if (vendor == 0x10EC) debug("(realtek)");
-  else if (vendor == 0x1234) debug("(qemu)");
-  else if (vendor == 0x1B36) debug("(qemu)");
-  debug(" did={4x} class={6x} (", device, devClass);
-
-  if (devClass == 0x010180)
-    debug("IDE controller device");
-  else if (devClass == 0x010601)
-    debug("AHCI device");
-  else if (devClass == 0x010801)
-    debug("NVMHCI device");
-  else if (devClass == 0x010802)
-    debug("NVMExpress device");
-  else if (devClass == 0x020000)
-    debug("Ethernet controller device");
-  else if (devClass == 0x030000)
-    debug("VGA Graphics device");
-  else if (devClass == 0x038000)
-    debug("non-VGA graphics device");
-  else if (devClass == 0x040300)
-    debug("audio device");
-  else if (devClass == 0x0c0330)
-    debug("XHCI device");
-  else if (devClass == 0x060000)
-    debug("host bridge device");
-  else if (devClass == 0x060100)
-    debug("ISA bridge device");
-  else if (devClass == 0x060400)
-    debug("PCI bridge device");
-  else if (devClass == 0x068000)
-    debug("some weird bridge device");
-  else if (devClass == 0x080501)
-    debug("SDHCI device");
-  else 
-    debug("unknown");
-  debug(")");
-}
-
-PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid) {
-  PciBridge* bridge = new PciBridge(dev, subbusid);
-  debug("bridge starting\n");
-  pci_detect([](pcidevice dev){
-    uint32_t vendor_device = pciread32(dev, 0);
-    uint16_t device = vendor_device >> 16;
-    uint16_t vendor = vendor_device & 0xFFFF;
-    uint32_t devClass = (pciread32(dev, 8) & 0xFFFFFF00) >> 8;
-    pci_debug_print_device(vendor, device, devClass);
-    uint8_t cap = pciread8(dev, 0x34);
-    if (cap) {
-      debug(" cap(");
-      while (cap) {
-        uint16_t val = pciread16(dev, cap);
-        uint8_t capid = val & 0xFF;
-        debug("{} ", std::string_view(pci_caps[capid]));
-        cap = val >> 8;
-      }
-      debug(")");
-    }
-    debug("\n");
-    return pci_find_driver(dev, vendor, device, devClass);
-  }, subbusid, bridge);
-  debug("bridge ending\n");
-  return bridge;
-}
-
 struct mb1 {
   uint32_t flags;
   uint32_t memlower;
@@ -213,17 +100,45 @@ void platform_init(void* platform_data, uint32_t magic) {
   pci_handle_bridge(0, 0);
 }
 #else
-#include "property_print.h"
+#include "rpi/property_print.h"
 #include "rpi/model.h"
-#include "sd.h"
+#include "rpi/sd.h"
+#include "rpi/framebuffer.h"
+#include "rpi/mailbox.h"
+#include "gic.h"
+
+void timer_init(uintptr_t base);
+
+future<void> f() {
+  // Automatic after integrating network and ntp
+  uint64_t currentTime = 1591308000000000ULL;
+  set_utc_offset(currentTime - get_timer_value());
+  debug("set utc offset\n");
+  while (true) {
+    currentTime += 1000000;
+    co_await wait_until(currentTime);
+    uint64_t time = (currentTime - 1591308000000000ULL) / 1000000;
+    debug("{}:{}:{}     ", time / 3600, (time / 60) % 60, time % 60);
+    debug("ctime = {}\n", currentTime);
+  }
+}
+
+void interrupt_check();
 
 void platform_init(void* platform_data, uint32_t magic) {
   rpi_entry model = getModel();
   debug_init(model.mmio_base);
+  if (model.mmio_base == 0x3F000000) {
+    interrupt_init(model.mmio_base);
+  } else {
+    gic_init(model.mmio_base);
+  }
+  timer_init(model.mmio_base);
   debug("Found Raspberry Pi {s} (rev {s} with {}MB RAM, modelno {x} manufactured by {s}\n", model.modelname, model.revision, model.memory, model.modelno, model.manufacturer);
 
-  interrupt_init();
-  //sd_init(model.mmio_base + 0x00300000);
+  RpiFramebuffer* fb = RpiFramebuffer::Create();
+  debug("Found monitor {s} {s} serial# {s} at resolution {}x{}\n", fb->m.brand, fb->m.name, fb->m.serial, fb->m.width, fb->m.height);
+//  sd_init(model.mmio_base + 0x00300000);
 }
 
 #endif
@@ -234,7 +149,14 @@ extern "C" void kernel_secondary_cpu() {
 
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   platform_init(platform_data, magic);
+  set_utc_offset(1591473338000000 - get_timer_value());
 //  asa_init();
+/*
+  while (1) {
+    interrupt_check();
+    debug("current timer is {}\r", get_timer_value());
+  }
+  */
   while(1) {}
 }
 

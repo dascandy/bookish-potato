@@ -1,6 +1,7 @@
 #include "model.h"
 #include "mailbox.h"
 
+#ifdef __aarch64__
 static rpi_entry models[] = {
   0x0002, "B", "1.0", 256, "Egoman", 0x20000000,
   0x0003, "B", "1.0", 256, "Egoman", 0x20000000,
@@ -76,5 +77,6 @@ rpi_entry getModel() {
   }
   return { 0xdeadbeef, "Unknown", "?.?", 4096, "??", mmiobase, };
 }
+#endif
 
 

@@ -1,6 +1,7 @@
 #include "mailbox.h"
 #include "io.h"
 #include <cstring>
+#include <algorithm>
 
 #define MBOX_READ         0x00
 #define MBOX_READ_STATUS  0x18
@@ -24,10 +25,11 @@ void mailbox_send(uint8_t port, uint32_t* ptr) {
 }
 
 size_t property_read(MailboxProperty property, uint8_t* buffer, size_t size) {
-  alignas(16) uint32_t mbox_buf[] = { 36, 0, (uint32_t)property, (uint32_t)size, 0, 0, 0, 0, 0 };
+  alignas(16) uint32_t mbox_buf[64] = { uint32_t(28 + size), 0, (uint32_t)property, (uint32_t)size, 0, 0, 0, 0, 0 };
+  memcpy((uint8_t*)mbox_buf + 20, buffer, size);
   mailbox_send(8, mbox_buf);
   memcpy(buffer, (uint8_t*)mbox_buf + 20, size);
-  return mbox_buf[4];
+  return mbox_buf[4] & 0x7FFFFFFF;
 }
 
 

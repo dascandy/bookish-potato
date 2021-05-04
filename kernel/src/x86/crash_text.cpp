@@ -1,5 +1,6 @@
 #include "crash.h"
 
+#ifdef __x86_64__
 static const char hextab[] = "0123456789abcdef";
 void crash_hexdump_region(size_t y, const uint8_t* num, size_t length, uint8_t attributes) {
   uint16_t* ptr = (uint16_t*)(0xb8000) + y * 80;
@@ -32,7 +33,7 @@ void crash_text(size_t x, size_t y, const char* text, uint8_t attributes) {
   }
 }
 
-void clearscreen() {
+static void clearscreen() {
   uint16_t* ptr = (uint16_t*)0xb8000, *end = (uint16_t*)0xb8000 + 80*25;
   for (; ptr != end; ++ptr) *ptr = 0x720;
 }
@@ -97,4 +98,5 @@ struct registers {
   while (1) {}
 }
 
+#endif
 

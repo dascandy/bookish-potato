@@ -7,24 +7,25 @@ SECTIONS
 	.text : ALIGN(4096)
 	{
 		*(.text.boot)
-		*(.text)
+		*(.text*)
 	}
  
 	/* Read-only data. */
 	.rodata : ALIGN(4096)
 	{
-		*(.rodata)
+		*(.rodata*)
 	}
  
 	.data : ALIGN(4096)
 	{
-		*(.data)
+		*(.data*)
 	}
+  . = ALIGN(4096);
   __bss_start = .;
-	.bss : ALIGN(4096)
+	.bss :
 	{
 		*(COMMON)
-		*(.bss)
+		*(.bss*)
 	}
   __bss_size = . - __bss_start;
 }

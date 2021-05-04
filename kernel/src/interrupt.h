@@ -2,11 +2,9 @@
 
 #include <cstdint>
 
-enum class IST {
-  Interrupt = 1,
-  Unhandled = 7,
-};
-void interrupt_init();
-void interrupt_set_vector(uint8_t vector, void (*)(), IST ist);
-
+typedef void(*interrupt_handler)();
+void interrupt_init(uintptr_t mmio_base = 0);
+void interrupt_register(interrupt_handler handler);
+void interrupt_check();
+void halt_for_interrupts();
 

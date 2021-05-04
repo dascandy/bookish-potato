@@ -1,6 +1,6 @@
 #pragma once
 
-namespace std {
+namespace s2 {
   template <typename T, typename U>
   auto min(T a, U b) -> decltype(a+b) {
     if (a < b) 

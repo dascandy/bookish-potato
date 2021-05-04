@@ -5,7 +5,7 @@
 #include <utility>
 #include <algorithm>
 
-namespace std {
+namespace s2 {
 
 template <typename T>
 class shared_ptr {
@@ -66,7 +66,7 @@ shared_ptr<T> make_shared(Args&&...args) {
   size_t minsize = max(sizeof(T), sizeof(size_t));
   char* buf = (char*)malloc(minsize + sizeof(size_t));
   T* p = (T*)buf;
-  new (p) T(std::forward<Args>(args)...);
+  new (p) T(s2::forward<Args>(args)...);
   size_t* c = (size_t*)(buf + minsize);
   return shared_ptr<T>(p, c);
 }

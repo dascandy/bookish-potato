@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <vector>
+#include <string_view>
 
 namespace s2 {
 
@@ -41,6 +42,10 @@ public:
   string(size_t n, uint32_t c) : string() {
     resize(n, c);
   }
+  string(s2::string_view sv) 
+  : string(sv.data(), sv.size())
+  {
+  }
   template <typename Iterator>
   string(Iterator it, Iterator e) 
   : string()
@@ -48,6 +53,9 @@ public:
     for (; it != e; ++it) {
       push_back(*it);
     }
+  }
+  operator string_view() {
+    return string_view(data(), data() + size());
   }
   // Additional constructors, for initializing with UTF16 or UTF32 contents.
   string(uint16_t *data) : string() {

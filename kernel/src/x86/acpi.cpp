@@ -48,7 +48,7 @@ void tryAcpiTable(uintptr_t address) {
       parseFacp(table);
       break;
     default:
-      debug("Found unknown ACPI table {} at {} size {}\n", std::string_view(table->Signature, table->Signature + 4), table, table->Length);
+      debug("Found unknown ACPI table {} at {} size {}\n", s2::string_view(table->Signature, table->Signature + 4), table, table->Length);
       break;
   }
 }

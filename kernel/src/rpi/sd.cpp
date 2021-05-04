@@ -1,5 +1,5 @@
 #include "sd.h"
-
+#include "io.h"
 
 // command flags
 #define CMD_NEED_APP        0x80000000
@@ -106,43 +106,43 @@ enum {
   control2    = 0x3c,
   slotisr_ver = 0xfc,
 };
-/*
-int sd_clk(unsigned int f)
+
+void sd_clk(uintptr_t emmc_base, unsigned int c)
 {
-    unsigned int d,c=41666666/f,x,s=32,h=0;
+  /*
     int cnt = 100000;
-    while((*EMMC_STATUS & (SR_CMD_INHIBIT|SR_DAT_INHIBIT)) && cnt--) wait_msec(1);
+    while (mmio_read<uint32_t>(emmc_base + control1) & (SR_CMD_INHIBIT|SR_DAT_INHIBIT) && cnt--) delay();
     if(cnt<=0) {
-        uart_puts("ERROR: timeout waiting for inhibit flag\n");
-        return SD_ERROR;
+        debug("ERROR: timeout waiting for inhibit flag\n");
+        return;
     }
 
-    *EMMC_CONTROL1 &= ~C1_CLK_EN; wait_msec(10);
-    x=c-1; if(!x) s=0; else {
-        if(!(x & 0xffff0000u)) { x <<= 16; s -= 16; }
-        if(!(x & 0xff000000u)) { x <<= 8;  s -= 8; }
-        if(!(x & 0xf0000000u)) { x <<= 4;  s -= 4; }
-        if(!(x & 0xc0000000u)) { x <<= 2;  s -= 2; }
-        if(!(x & 0x80000000u)) { x <<= 1;  s -= 1; }
-        if(s>0) s--;
-        if(s>7) s=7;
+    mmio_clear(emmc_base + control1, C1_CLK_EN);
+    wait_msec(10);
+    unsigned int d,c=41666666/f;
+    d=c;
+    if(d<=2) {
+      d=2;
     }
-    if(sd_hv>HOST_SPEC_V2) d=c; else d=(1<<s);
-    if(d<=2) {d=2;s=0;}
-    uart_puts("sd_clk divisor ");uart_hex(d);uart_puts(", shift ");uart_hex(s);uart_puts("\n");
-    if(sd_hv>HOST_SPEC_V2) h=(d&0x300)>>2;
-    d=(((d&0x0ff)<<8)|h);
-    *EMMC_CONTROL1=(*EMMC_CONTROL1&0xffff003f)|d; wait_msec(10);
-    *EMMC_CONTROL1 |= C1_CLK_EN; wait_msec(10);
-    cnt=10000; while(!(*EMMC_CONTROL1 & C1_CLK_STABLE) && cnt--) wait_msec(10);
+    debug("sd_clk divisor {x}\n", d);
+    d=(((d&0x0ff)<<8)|((d&0x300)>>2));
+    mmio_write(emmc_base + control1, (mmio_read<uint32_t>(emmc_base + control1) & 0xFFFF003F) | d);
+    wait_msec(10);
+    mmio_set(emmc_base + control1, C1_CLK_EN);
+    wait_msec(10);
+    cnt=10000; 
+    while(!(*EMMC_CONTROL1 & C1_CLK_STABLE) && cnt--) 
+      wait_msec(10);
     if(cnt<=0) {
-        uart_puts("ERROR: failed to get stable clock\n");
+        debug("ERROR: failed to get stable clock\n");
         return SD_ERROR;
     }
     return SD_OK;
+    */
 }
 
 void sd_init(uintptr_t sd_base) {
+  /*
     // Set up pins
     long r,cnt,ccs=0;
     r=*GPFSEL4; r&=~(7<<(7*3)); *GPFSEL4=r;
@@ -246,7 +246,9 @@ void sd_init(uintptr_t sd_base) {
     sd_scr[0]&=~SCR_SUPP_CCS;
     sd_scr[0]|=ccs;
     return SD_OK;
+    */
 }
+/*
 
 unsigned long sd_scr[2], sd_ocr, sd_rca, sd_err, sd_hv;
 

@@ -1,13 +1,22 @@
 V Bootable on x86 qemu
-- SMP on x86
-V Memory management
+V Memory management on x86
 - Interrupt handling on x86 qemu
 
-- Bootable on rpi4
-- RPI4-4gb support
+V Bootable on rpi4
+V RPI4-4gb support
+V Interrupt handling on rpi3b+
 - Interrupt handling on rpi4
+- memory management on rpi
 
-- PCI enumeration
+- Bootable on pinephone
+- Interrupt handling on pinephone
+
+- SMP on x86
+- SMP on rpi
+- SMP on pinephone
+
+V PCI enumeration x86
+- PCI enumeration rpi4
 - XHCI driver
 - USB stack
 - USB HID
@@ -15,7 +24,7 @@ V Memory management
 - Network driver x86
 - Network driver ARM/RPI4
 - Network stack IPv6
-- DHCPv6 ?
+- DHCPv6
 
 - Multiprocess support
 - Kernel-user channel

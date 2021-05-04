@@ -1,6 +1,8 @@
 #pragma once
 
-namespace std {
+#include <type_traits>
+
+namespace s2 {
 
 template <typename T, typename U>
 class pair {
@@ -15,13 +17,9 @@ public:
 };
 
 template <typename T, typename U>
-std::pair<T, U> make_pair(T t, U u) {
-  return std::pair<T, U>(t, u);
+s2::pair<T, U> make_pair(T t, U u) {
+  return s2::pair<T, U>(t, u);
 }
-
-template <typename T> struct remove_reference { typedef T type; };
-template <typename T> struct remove_reference<T&> { typedef T type; };
-template <typename T> struct remove_reference<T&&> { typedef T type; };
 
 template <typename T>
 struct is_const {
@@ -35,16 +33,23 @@ struct is_const<const T> {
 template <typename T>
 typename remove_reference<T>::type&& move(T&& arg)
 {
-  static_assert(!std::is_const<T>::value, "Do not use std::move on const objects, it does not work.");
+  static_assert(!s2::is_const<T>::value, "Do not use std::move on const objects, it does not work.");
   return static_cast<typename remove_reference<T>::type&&>(arg);
 }
 
 template <class T> T&& forward (typename remove_reference<T>::type& arg) noexcept {
-  return static_cast<decltype(arg)&&>(arg);
+  return static_cast<T&&>(arg);
 }
 
 template <class T> T&& forward (typename remove_reference<T>::type&& arg) noexcept {
-  return static_cast<decltype(arg)&&>(arg);
+  return static_cast<T&&>(arg);
+}
+
+template <typename T, typename U = T>
+constexpr T exchange(T& obj, U&& new_value) {
+  T old_value = s2::move(obj);
+  obj = s2::forward<U>(new_value);
+  return old_value;
 }
 
 }

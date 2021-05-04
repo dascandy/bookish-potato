@@ -4,7 +4,7 @@
 
 static char hextab[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-void debug_field(uint64_t value, std::string_view spec) {
+void debug_field(uint64_t value, s2::string_view spec) {
   size_t pad = 0;
   int base = 10;
   auto b = spec.begin();
@@ -21,14 +21,14 @@ void debug_field(uint64_t value, std::string_view spec) {
   }
   while (bp > buffer + 63 - pad) *bp-- = '0';
   bp++;
-  debug_field(std::string_view(bp, buffer+64), "");
+  debug_field(s2::string_view(bp, buffer+64), "");
 }
 
-void debug_field(void* value, std::string_view spec) {
+void debug_field(void* value, s2::string_view spec) {
   debug_field((uintptr_t)value, "16x");
 }
 
-void debug_field(int64_t value, std::string_view spec) {
+void debug_field(int64_t value, s2::string_view spec) {
   if (value < 0) debug_field("-", "");
   debug_field((uint64_t)value, spec);
 }

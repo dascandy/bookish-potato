@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace s2 {
 
 template <class T, T v> struct integral_constant {
@@ -60,41 +62,42 @@ template <typename T> struct is_same<T, T> : true_type {};
 template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U>::value;
 
 template <typename Base, typename Derived> struct is_base_of;
-template <typename From, typename To> struct is_convertible;
+
+template <typename T> struct is_void : is_same<void, typename remove_cv<T>::type> {};
+template <typename T> inline constexpr bool is_void_v = is_void<T>::value;
+
+template <typename T>
+T declval();
+
+namespace detail {
+  template<class>
+  using true_type_for = s2::true_type;
+  template<class T>
+  auto test_returnable(int) -> true_type_for<T()>;
+  template<class>
+  auto test_returnable(...) -> s2::false_type;
+  template<class From, class To>
+  auto test_nonvoid_convertible(int) -> true_type_for<decltype(s2::declval<void(&)(To)>()(s2::declval<From>()))>;
+  template<class, class>
+  auto test_nonvoid_convertible(...) -> s2::false_type;
+}
+ 
+template<class From, class To>
+struct is_convertible : s2::integral_constant<bool,
+    (decltype(detail::test_returnable<To>(0))::value &&
+     decltype(detail::test_nonvoid_convertible<From, To>(0))::value) ||
+    (s2::is_void<From>::value && s2::is_void<To>::value)
+> {};
+
 template <typename Fn, typename... ArgTypes> struct is_invocable;
 template <typename R, typename Fn, typename... ArgTypes> struct is_invocable_r;
 template <typename Fn, typename... ArgTypes> struct is_nothrow_invocable;
 template <typename R, typename Fn, typename... ArgTypes> struct is_nothrow_invocable_r;
 
-template <typename T> struct is_void : is_same<void, typename remove_cv<T>::type> {};
-template <typename T> inline constexpr bool is_void_v = is_void<T>::value;
 template <typename T> struct is_null_pointer : is_same<decltype(nullptr), typename remove_cv<T>::type> {};
 template <typename T> inline constexpr bool is_null_pointer_v = is_null_pointer<T>::value;
 
 
-template <typename T> struct __is_integral : false_type {};
-template <typename T> struct __is_integral<bool> : true_type {};
-template <typename T> struct __is_integral<char> : true_type {};
-template <typename T> struct __is_integral<char8_t> : true_type {};
-template <typename T> struct __is_integral<char16_t> : true_type {};
-template <typename T> struct __is_integral<char32_t> : true_type {};
-template <typename T> struct __is_integral<wchar_t> : true_type {};
-template <typename T> struct __is_integral<short> : true_type {};
-template <typename T> struct __is_integral<int> : true_type {};
-template <typename T> struct __is_integral<long> : true_type {};
-template <typename T> struct __is_integral<long long> : true_type {};
-template <typename T> struct __is_integral<signed char> : true_type {};
-template <typename T> struct __is_integral<signed short> : true_type {};
-template <typename T> struct __is_integral<signed int> : true_type {};
-template <typename T> struct __is_integral<signed long> : true_type {};
-template <typename T> struct __is_integral<signed long long> : true_type {};
-template <typename T> struct __is_integral<unsigned char> : true_type {};
-template <typename T> struct __is_integral<unsigned short> : true_type {};
-template <typename T> struct __is_integral<unsigned int> : true_type {};
-template <typename T> struct __is_integral<unsigned long> : true_type {};
-template <typename T> struct __is_integral<unsigned long long> : true_type {};
-template <typename T> struct is_integral : __is_integral<remove_cv_t<T>> {};
-template <typename T> inline constexpr bool is_integral_v = __is_integral<remove_cv_t<T>>::value;
 template <typename T> struct is_floating_point : integral_constant<bool, is_same_v<float, remove_cv_t<T>> || is_same_v<double, remove_cv_t<T>> || is_same_v<long double, remove_cv_t<T>>> {};
 template <typename T> inline constexpr bool is_floating_point_v = is_floating_point<T>::value;
 
@@ -110,7 +113,6 @@ template <typename T> struct is_rvalue_reference<T&&> : true_type {};
 template <typename T> inline constexpr bool is_rvalue_reference_v = is_rvalue_reference<T>::value;
 template <typename T> struct is_pointer : false_type {};
 template <typename T> struct is_pointer<T*> : true_type {};
-template <typename T> inline constexpr bool is_void_v = is_void<T>::value;
 
 /*
 template <typename T> struct is_member_object_pointer : is_same<void, typename remove_cv<T>::type> {};
@@ -125,7 +127,6 @@ template <typename T> struct is_class : is_same<void, typename remove_cv<T>::typ
 template <typename T> inline constexpr bool is_void_v = is_void<T>::value;
 template <typename T> struct is_function : is_same<void, typename remove_cv<T>::type> {};
 template <typename T> inline constexpr bool is_void_v = is_void<T>::value;
-*/
 
 // composite type categories:
 template <typename T> struct is_reference;
@@ -206,7 +207,7 @@ using add_pointer_t = typename add_pointer<T>::type;
 
 // other transformations:
 template <size_t Len,
-size_t Align = /*default-alignment*/ > 
+size_t Align = 42 > 
 struct aligned_storage;
 template <size_t Len, typename... Types> struct aligned_union;
 template <typename T> struct decay;
@@ -219,7 +220,7 @@ template <typename> typename result_of; // not defined
 template <typename F, typename... ArgTypes> typename result_of<F(ArgTypes...)>;
 template <typename F, typename... ArgTypes> typename invoke_result;
 template <size_t Len,
-size_t Align = /*default-alignment*/ > 
+size_t Align = 42 > 
 using aligned_storage_t = typename aligned_storage<Len, Align>::type;
 template <size_t Len, typename... Types>
 using aligned_union_t = typename aligned_union<Len, Types...>::type;
@@ -398,9 +399,10 @@ template <typename T, typename U> inline constexpr bool is_same_v
 = is_same<T, U>::value;
 template <typename Base, typename Derived> inline constexpr bool is_base_of_v
 = is_base_of<Base, Derived>::value;
+*/
 template <typename From, typename To> inline constexpr bool is_convertible_v
 = is_convertible<From, To>::value;
-
+/*
 template <typename Fn, typename... ArgTypes> 
 inline constexpr bool is_invocable_v
   = is_invocable<Fn, ArgTypes...>::value;
@@ -421,6 +423,7 @@ template<typename B> inline constexpr bool negation_v = negation<B>::value;
 
 // constant evaluation context
 constexpr bool is_constant_evaluated() noexcept;
+*/
 }
 
 

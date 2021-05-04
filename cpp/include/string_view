@@ -1,12 +1,16 @@
 #pragma once
 
-namespace std {
+namespace s2 {
   class string_view {
   public:
     template <size_t N>
     string_view(const char (&arr)[N])
     : begin_(arr)
     , end_(arr + N)
+    {}
+    string_view(const string_view& rhs)
+    : begin_(rhs.begin_)
+    , end_(rhs.end_)
     {}
     string_view(const char* begin, const char* end = nullptr)
     : begin_(begin)
@@ -19,6 +23,7 @@ namespace std {
     }
     const char* begin() { return begin_; }
     const char* end() { return end_; }
+    const char* data() { return begin_; }
     bool empty() { return begin_ == end_; }
     size_t size() { return end_ - begin_; }
     char operator[](size_t offset) { return begin_[offset]; }

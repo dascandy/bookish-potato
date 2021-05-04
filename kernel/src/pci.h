@@ -13,6 +13,10 @@ public:
   void AddDevice(pcidevice dev, PciDevice* devobj);
 };
 
+PciDevice* pci_find_driver(pcidevice dev, uint16_t vendor, uint16_t device, uint32_t devClass);
+void pci_debug_print_device(uint16_t vendor, uint16_t device, uint32_t devClass);
+PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid);
+
 void pci_detect(PciDevice* (*onDevice)(pcidevice), uint8_t bus, PciBridge* bridge);
 uint8_t pciread8(pcidevice dev, uint8_t regno);
 uint16_t pciread16(pcidevice dev, uint8_t regno);

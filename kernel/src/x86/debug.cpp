@@ -10,7 +10,7 @@ void debug_char(char c) {
   outb(0xE9, c);
 }
 
-void debug_field(std::string_view text, std::string_view spec) {
+void debug_field(s2::string_view text, s2::string_view spec) {
   for (auto& c : text) {
     debug_char(c);
   }

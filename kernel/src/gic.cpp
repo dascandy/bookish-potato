@@ -1,0 +1,92 @@
+#include "interrupt.h"
+#include "io.h"
+
+enum GicRegisters : uint32_t {
+  GICD_CTLR = 0x1000,
+  GICD_TYPER = 0x1004,
+  GICD_IIDR = 0x1008,
+  GICD_IGROUPR0 = 0x1080,
+  GICD_ISENABLER0 = 0x1100,
+  GICD_ICENABLER0 = 0x1180,
+  GICD_ISPENDR0 = 0x1200,
+  GICD_ICPENDR0 = 0x1280,
+  GICD_ISACTIVER0 = 0x1300,
+  GICD_ICACTIVER0 = 0x1380,
+  GICD_IPRIORITYR0 = 0x1400,
+  GICD_ITARGETSR0 = 0x1800,
+  GICD_ICFGR0 = 0x1820,
+  GICD_PPISR = 0x1D00,
+  GICD_SPISR0 = 0x1D04,
+  GICD_SGIR = 0x1F00,
+  GICD_CPENDSGIR0 = 0x1F10,
+  GICD_SPENDSGIR0 = 0x1F20,
+  GICD_PIDR4 = 0x1FD0, 
+  GICD_PIDR5 = 0x1FD4, 
+  GICD_PIDR6 = 0x1FD8, 
+  GICD_PIDR7 = 0x1FDC,
+  GICD_PIDR0 = 0x1FE0,
+  GICD_PIDR1 = 0x1FE4,
+  GICD_PIDR2 = 0x1FE8,
+  GICD_PIDR3 = 0x1FEC,
+  GICD_CIDR0 = 0x1FF0,
+  GICD_CIDR1 = 0x1FF4,
+  GICD_CIDR2 = 0x1FF8,
+  GICD_CIDR3 = 0x1FFC,
+
+  GICC_CTLR = 0x2000,
+  GICC_PMR = 0x2004,
+  GICC_BPR = 0x2008,
+  GICC_IAR = 0x200C,
+  GICC_EOIR = 0x2010,
+  GICC_RPR = 0x2014,
+  GICC_HPPIR = 0x2018,
+  GICC_ABPR = 0x201C,
+  GICC_AIAR = 0x2020,
+  GICC_AEOIR = 0x2024,
+  GICC_AHPPIR = 0x2028,
+  GICC_APR0 = 0x20D0,
+  GICC_NSAPR0 = 0x20E0,
+  GICC_IIDR = 0x20FC,
+  GICC_DIR = 0x3000, // ???
+/*
+  GICH_HCR = 0x4000,
+  GICH_VTR = 0x4004,
+  GICH_VMCR = 0x4008,
+  GICH_MISR = 0x4010,
+  GICH_EISR0 = 0x4020,
+  GICH_ELSR0 = 0x4030,
+  GICH_APR0 = 0x40F0,
+  GICH_LR0 = 0x4100,
+  GICH_LR1 = 0x4104,
+  GICH_LR2 = 0x4108,
+  GICH_LR3 = 0x410C,
+
+  GICV_CTLR = 0x6000,
+  GICV_PMR = 0x6004,
+  GICV_BPR = 0x6008,
+  GICV_IAR = 0x600C,
+  GICV_EOIR = 0x6010,
+  GICV_RPR = 0x6004,
+  GICV_HPPIR = 0x6018,
+  GICV_ABPR = 0x601C,
+  GICV_AIAR = 0x6020,
+  GICV_AEOIR = 0x6024,
+  GICV_AHPPIR = 0x6028,
+  GICV_APR0 = 0x60D0,
+  GICV_IIDR = 0x60FC,
+  GICV_DIR = 0x7000,
+  */
+};
+
+uintptr_t gic_base;
+
+void gic_init(uintptr_t mmio_base) {
+  gic_base = mmio_base + 0x1840000;
+}
+
+void gic_enable_interrupt(int interrupt) {
+  mmio_write(gic_base + GICD_ISENABLER0 + (interrupt / 32), 1 << (interrupt % 32));
+}
+
+
+
