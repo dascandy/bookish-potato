@@ -19,7 +19,7 @@ enum BgaReg {
 };
 
 BgaFramebuffer::BgaFramebuffer(pcidevice dev) 
-: regs(dev, 2)
+: regs(dev, PciBars::Bar2)
 , screen(dev, regs.get())
 {
   uintptr_t p = (uintptr_t)regs.get();
@@ -30,11 +30,12 @@ BgaFramebuffer::BgaFramebuffer(pcidevice dev)
 
 BgaFramebuffer::BgaScreen::BgaScreen(pcidevice dev, void* edid) 
 : Screen(s2::span<const uint8_t>((const uint8_t*)edid, 256))
-, map(dev, 0)
+, map(dev, PciBars::Bar0, DeviceMemory)
 , bochsregs((uintptr_t)edid + 0x500)
 , qemuregs((uintptr_t)edid + 0x400)
 {
-  debug("Found Bochs graphics adapter model {x}\n", mmio_read<uint32_t>(bochsregs));
+  mmio_write<uint16_t>(bochsregs, 0xb0c5);
+  debug("Found Bochs graphics adapter model {x}\n", mmio_read<uint16_t>(bochsregs));
   Register();
 }
 
@@ -43,17 +44,18 @@ bool BgaFramebuffer::BgaScreen::SetActiveResolution(const Resolution& res, size_
   this->bufferCount = bufferCount;
   xres = res.width;
   yres = res.height;
-  mmio_write<uint32_t>(bochsregs + 4*Enable, 0);
-  mmio_write<uint32_t>(bochsregs + 4*XRes, xres);
-  mmio_write<uint32_t>(bochsregs + 4*YRes, yres);
-  mmio_write<uint32_t>(bochsregs + 4*Bpp, 32);
-  mmio_write<uint32_t>(bochsregs + 4*VirtWidth, xres);
-  mmio_write<uint32_t>(bochsregs + 4*VirtHeight, bufferCount * yres);
-  mmio_write<uint32_t>(bochsregs + 4*XOffset, 0);
-  mmio_write<uint32_t>(bochsregs + 4*YOffset, 0);
-  mmio_write<uint32_t>(bochsregs + 4*Enable, 0xC1);
+  mmio_write<uint16_t>(bochsregs + 2*Enable, 0);
+  mmio_write<uint16_t>(bochsregs + 2*XRes, xres);
+  mmio_write<uint16_t>(bochsregs + 2*YRes, yres);
+  mmio_write<uint16_t>(bochsregs + 2*Bpp, 32);
+  mmio_write<uint16_t>(bochsregs + 2*VirtWidth, xres);
+  mmio_write<uint16_t>(bochsregs + 2*VirtHeight, bufferCount * yres);
+  mmio_write<uint16_t>(bochsregs + 2*XOffset, 0);
+  mmio_write<uint16_t>(bochsregs + 2*YOffset, 0);
+  mmio_write<uint16_t>(bochsregs + 2*Enable, 0xE1);
   displayBufferId = 0;
   queuedBufferId = 3;
+  currentResolution = res;
   return true;
 }
 
@@ -67,10 +69,10 @@ future<void> BgaFramebuffer::BgaScreen::QueueBuffer(void* ptr) {
   case 2:
     if (ptr == map.get()) {
       displayBufferId = 1;
-      mmio_write<uint32_t>(bochsregs + 4*YOffset, 0);
+      mmio_write<uint16_t>(bochsregs + 2*YOffset, 0);
     } else {
       displayBufferId = 0;
-      mmio_write<uint32_t>(bochsregs + 4*YOffset, yres);
+      mmio_write<uint16_t>(bochsregs + 2*YOffset, yres);
     }
     break;
   }

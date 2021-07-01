@@ -4,6 +4,7 @@
 objcopy -I elf64-x86-64 -O elf32-i386 build/amd64/bin/kernel build/amd64/bin/kernel.i386
 qemu-system-x86_64 -machine q35 --cpu Skylake-Client \
     -smp 1,cores=4,threads=2,sockets=1,maxcpus=8 \
+    -vga none \
     -m 4G \
     -device bochs-display,bus=pcie.0 \
     -device pcie-pci-bridge,id=pci,bus=pcie.0 \
@@ -17,4 +18,5 @@ qemu-system-x86_64 -machine q35 --cpu Skylake-Client \
 # -nic tap,ipv6=on,ipv4=off,model=e1000,mac=52:54:98:76:54:32
 
 #    -device sdhci-pci --device sd-card \
+#    -device virtio-gpu,bus=pcie.0 \
 

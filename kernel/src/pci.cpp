@@ -3,9 +3,8 @@
 #include "nvme.h"
 #include "xhci.h"
 #include "debug.h"
-#ifdef __x86_64__
-#include "x86/bga.h"
-#endif
+#include "bga.h"
+#include "virtiogpu.h"
 
 PciBridge::PciBridge(pcidevice dev, uint8_t subbusid) {}
 void PciBridge::AddDevice(pcidevice dev, PciDevice* devobj) {}
@@ -112,6 +111,8 @@ PciDevice* pci_find_driver(pcidevice dev, uint16_t vendor, uint16_t device, uint
 #ifdef __x86_64__
   if (vendor == 0x1234 && device == 0x1111) {
     new BgaFramebuffer(dev);
+  } else if (vendor == 0x1af4 && device == 0x1050) {
+    new VirtioGpu(dev);
   }
 #endif
 

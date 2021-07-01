@@ -139,7 +139,7 @@ static xhci_command create_enableslot_command(uint8_t slottype) {
 
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
-, bar1(dev, 0)
+, bar1(dev, PciBars::Bar0)
 {
   cr = (uintptr_t)bar1.get();
   opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);

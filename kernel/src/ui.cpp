@@ -1,14 +1,15 @@
 #include "ui.h"
+#include "debug.h"
 
 void Ui::Compositor::CreateSplashScreen(Screen* screen) {
   uint8_t* buffer = (uint8_t*)screen->GetFreeBuffer();
-
+  debug("buffer at {x} with res {}x{}\n", buffer, screen->currentResolution.width,screen->currentResolution.height);
   for (size_t n = 0; n < screen->currentResolution.height; n++) {
     for (size_t m = 0; m < screen->currentResolution.width; m++) {
-      buffer[4*m+n+0] = n % 256;
-      buffer[4*m+n+1] = m % 256;
-      buffer[4*m+n+2] = 128;
-      buffer[4*m+n+3] = 128;
+      buffer[4*m+4*screen->currentResolution.width*n+0] = n % 256;
+      buffer[4*m+4*screen->currentResolution.width*n+1] = m % 256;
+      buffer[4*m+4*screen->currentResolution.width*n+2] = 128;
+      buffer[4*m+4*screen->currentResolution.width*n+3] = 128;
     }
   }
 
