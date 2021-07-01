@@ -5,13 +5,8 @@
 #include <span>
 #include <string>
 
-s2::string translate(s2::string brand) {
-  if (brand == "IVM") return "Iiyama";
-  return "Unknown";
-}
-
-
 void Monitor::FromEdid(Monitor& m, s2::span<uint8_t> edid) {
+  /*
   // TODO: validate
   char brand[4] = { char('@' + ((edid[8] >> 2) & 0x1F)), char('@' + (((edid[8] << 3) | (edid[9] >> 5)) & 0x1F)), char('@' + ((edid[9]) & 0x1F)), 0 };
   m.brand = translate(brand);
@@ -45,6 +40,7 @@ void Monitor::FromEdid(Monitor& m, s2::span<uint8_t> edid) {
       }
     }
   }
+  */
 }
 
 s2::span<uint8_t> RpiFramebuffer::ReadEdid(uint8_t* buffer) {

@@ -77,6 +77,8 @@ public:
   constexpr span& operator=(const span& other) noexcept = default;
   constexpr iterator begin() const noexcept { return data_; }
   constexpr const_iterator cbegin() const noexcept { return data_; }
+  constexpr iterator end() const noexcept { return data_ + size_; }
+  constexpr const_iterator cend() const noexcept { return data_ + size_; }
   /*
   constexpr reverse_iterator rbegin() const noexcept { return std::make_reverse_iterator(end()); }
   constexpr const_reverse_iterator crbegin() const noexcept { return std::make_reverse_iterator(cend()); }

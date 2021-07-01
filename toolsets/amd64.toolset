@@ -1,7 +1,7 @@
 
 template: __builtin_clang
-compiler: clang++ --sysroot=sysroot --target=x86_64-unknown-linux-gnu -Wno-gnu-array-member-paren-init
-compiler-cpp: clang++ -std=c++2a --sysroot=sysroot --target=x86_64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include -Wno-gnu-array-member-paren-init
+compiler: clang++-12 --sysroot=sysroot --target=x86_64-unknown-linux-gnu -Wno-gnu-array-member-paren-init
+compiler-cpp: clang++-12 -std=c++2a --sysroot=sysroot --target=x86_64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include -Wno-gnu-array-member-paren-init
 linker: ld -T kernel/src/link.ld.amd64
 archiver: ar
 cross: true

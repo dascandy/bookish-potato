@@ -3,6 +3,9 @@
 #include "nvme.h"
 #include "xhci.h"
 #include "debug.h"
+#ifdef __x86_64__
+#include "x86/bga.h"
+#endif
 
 PciBridge::PciBridge(pcidevice dev, uint8_t subbusid) {}
 void PciBridge::AddDevice(pcidevice dev, PciDevice* devobj) {}
@@ -61,7 +64,7 @@ void pci_detect(PciDevice* (*onDevice)(pcidevice), uint8_t bus, PciBridge* rootd
     {
       PciDevice* devobj = nullptr;
       pcidevice dev = (bus << 8) | (slot << 3) | function;
-      debug("pciread for dev {x}\n", dev);
+//      debug("pciread for dev {x}\n", dev);
 
       uint8_t header = pciread8(dev, 0x0E);
       if ( header & 0x80 )
@@ -106,7 +109,11 @@ PciDevice* pci_find_driver(pcidevice dev, uint16_t vendor, uint16_t device, uint
   }
 
   // 1. find match for vendor/device
-
+#ifdef __x86_64__
+  if (vendor == 0x1234 && device == 0x1111) {
+    new BgaFramebuffer(dev);
+  }
+#endif
 
   // 2. find match for device class
   if (devClass == 0x010802) {
@@ -164,7 +171,6 @@ PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid) {
   PciBridge* bridge = new PciBridge(dev, subbusid);
   debug("bridge starting\n");
   pci_detect([](pcidevice dev){
-    debug("detect callback\n");
     uint32_t vendor_device = pciread32(dev, 0);
     uint16_t device = vendor_device >> 16;
     uint16_t vendor = vendor_device & 0xFFFF;

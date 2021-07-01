@@ -3,6 +3,7 @@
 #include "map.h"
 #include "asa.h"
 #include "pci.h"
+#include "debug.h"
 
 struct pte {
         uint64_t p:1;
@@ -159,28 +160,30 @@ mapping::mapping(uintptr_t address, size_t bytes, MappingUse use)
   }
 }
 
-mapping::mapping(pcidevice dev, int barno) {
-  uint64_t address = pciread32(dev, 0x10);
+mapping::mapping(pcidevice dev, int barno) 
+{
+  uint64_t address = pciread32(dev, barno * 4 + 0x10);
   switch (address & 0x7) {
     case 0x0:
       // 32-bit
     case 0x2:
       // 20-bit
-      pciwrite32(dev, 0x10, 0xFFFFFFFF);
-      bytecount = ~(pciread32(dev, 0x10) & 0xFFFFFFF0) + 0x1;
-      pciwrite32(dev, 0x10, (uint32_t)address);
+      pciwrite32(dev, 0x10 + barno * 4, 0xFFFFFFFF);
+      bytecount = ~(pciread32(dev, 0x10 + barno * 4) & 0xFFFFFFF0) + 0x1;
+      pciwrite32(dev, 0x10 + barno * 4, (uint32_t)address);
       break;
     case 0x4:
       // 64-bit
-      address |= (uint64_t)pciread32(dev, 0x14) << 32;
-      pciwrite32(dev, 0x10, 0xFFFFFFFF);
-      pciwrite32(dev, 0x14, 0xFFFFFFFF);
-      bytecount = ~((((uint64_t)pciread32(dev, 0x14) << 32) | pciread32(dev, 0x10)) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;
-      pciwrite32(dev, 0x10, (uint32_t)address);
-      pciwrite32(dev, 0x14, (uint32_t)(address >> 32));
+      address |= (uint64_t)pciread32(dev, 0x14 + barno * 4) << 32;
+      pciwrite32(dev, 0x10 + barno * 4, 0xFFFFFFFF);
+      pciwrite32(dev, 0x14 + barno * 4, 0xFFFFFFFF);
+      bytecount = ~((((uint64_t)pciread32(dev, 0x14 + barno * 4) << 32) | pciread32(dev, 0x10 + barno * 4)) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;
+      pciwrite32(dev, 0x10 + barno * 4, (uint32_t)address);
+      pciwrite32(dev, 0x14 + barno * 4, (uint32_t)(address >> 32));
       break;
     default:
     // invalid or IO space
+      bytecount = 0;
       virtaddr = 0;
       return;
   }
@@ -190,6 +193,8 @@ mapping::mapping(pcidevice dev, int barno) {
     bytecount += 0x1000;
     address -= address & 0xFFF;
   }
+  virtaddr = asa_alloc(bytecount);
+  debug("mapping from {x} length {x} to {x}\n", address, bytecount, virtaddr);
   for (size_t n = 0; n < bytecount; n += 4096) {
     platform_map((void*)(virtaddr + n), address + n, DeviceRegisters);
   }

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <vector>
 #include <string_view>
+#include <span>
 
 namespace s2 {
 
@@ -58,6 +59,7 @@ public:
     return string_view(data(), data() + size());
   }
   // Additional constructors, for initializing with UTF16 or UTF32 contents.
+  static string from_cp437(span<const uint8_t> data);
   string(uint16_t *data) : string() {
     while (*data) {
       push_back(getUtf16Char(data));

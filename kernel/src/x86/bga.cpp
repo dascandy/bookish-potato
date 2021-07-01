@@ -2,6 +2,7 @@
 #include "io.h"
 #include "pci.h"
 #include "map.h"
+#include "debug.h"
 
 #ifdef __x86_64__
 enum BgaReg {
@@ -17,57 +18,85 @@ enum BgaReg {
   YOffset
 };
 
-#define VIRTUAL_ADDRESS 0xFFFFFF0100000000
-
-static inline void write_reg(BgaReg reg, uint16_t value) {
-  outw(0x1CE, reg);
-  outw(0x1CF, value);
-}
-
-static inline uint16_t read_reg(BgaReg reg) {
-  outw(0x1CE, reg);
-  return inw(0x1CF);
-}
-
 BgaFramebuffer::BgaFramebuffer(pcidevice dev) 
+: regs(dev, 2)
+, screen(dev, regs.get())
 {
-  uint32_t physaddr = pciread32(dev, 0x10) & 0xFFFFFFF0;
-  for (size_t n = 0; n < 4096; n++) {
-    platform_map((void*)(VIRTUAL_ADDRESS + n * 4096), physaddr + n * 4096, DeviceMemory);
-  }
+  uintptr_t p = (uintptr_t)regs.get();
 }
 
-void BgaFramebuffer::setResolution(size_t x, size_t y, size_t bufferCount) {
+//    uint32_t *buffer;
+//    size_t xres, yres, displayBufferId;
+
+BgaFramebuffer::BgaScreen::BgaScreen(pcidevice dev, void* edid) 
+: Screen(s2::span<const uint8_t>((const uint8_t*)edid, 256))
+, map(dev, 0)
+, bochsregs((uintptr_t)edid + 0x500)
+, qemuregs((uintptr_t)edid + 0x400)
+{
+  debug("Found Bochs graphics adapter model {x}\n", mmio_read<uint32_t>(bochsregs));
+  Register();
+}
+
+bool BgaFramebuffer::BgaScreen::SetActiveResolution(const Resolution& res, size_t bufferCount) {
   // TODO: any checking on result values
-  xres = x;
-  yres = y;
-  bufferId = 0;
-  write_reg(Enable, 0);
-  write_reg(XRes, x);
-  write_reg(YRes, y);
-  write_reg(Bpp, 32);
-  write_reg(VirtWidth, x);
-  write_reg(VirtHeight, bufferCount * y);
-  write_reg(XOffset, 0);
-  write_reg(YOffset, 0);
-  write_reg(Enable, 0x61);
+  this->bufferCount = bufferCount;
+  xres = res.width;
+  yres = res.height;
+  mmio_write<uint32_t>(bochsregs + 4*Enable, 0);
+  mmio_write<uint32_t>(bochsregs + 4*XRes, xres);
+  mmio_write<uint32_t>(bochsregs + 4*YRes, yres);
+  mmio_write<uint32_t>(bochsregs + 4*Bpp, 32);
+  mmio_write<uint32_t>(bochsregs + 4*VirtWidth, xres);
+  mmio_write<uint32_t>(bochsregs + 4*VirtHeight, bufferCount * yres);
+  mmio_write<uint32_t>(bochsregs + 4*XOffset, 0);
+  mmio_write<uint32_t>(bochsregs + 4*YOffset, 0);
+  mmio_write<uint32_t>(bochsregs + 4*Enable, 0xC1);
+  displayBufferId = 0;
+  queuedBufferId = 3;
+  return true;
 }
 
-size_t BgaFramebuffer::getWidth() {
-  return xres;
+future<void> BgaFramebuffer::BgaScreen::QueueBuffer(void* ptr) {
+    uint8_t displayBufferId, queuedBufferId, bufferCount;
+  switch(bufferCount) {
+  case 1:
+    return {};
+  case 3:
+    // Have no way to detect vsync on bochs graphics device, just use as double-buffered
+  case 2:
+    if (ptr == map.get()) {
+      displayBufferId = 1;
+      mmio_write<uint32_t>(bochsregs + 4*YOffset, 0);
+    } else {
+      displayBufferId = 0;
+      mmio_write<uint32_t>(bochsregs + 4*YOffset, yres);
+    }
+    break;
+  }
+  return {};
 }
 
-size_t BgaFramebuffer::getHeight() {
-  return yres;
+void* BgaFramebuffer::BgaScreen::GetFreeBuffer() {
+  uint8_t bufferToReturn;
+  switch(bufferCount) {
+  default:
+  case 1: 
+    bufferToReturn = 0;
+    break;
+  case 2:
+    bufferToReturn = 1 - displayBufferId;
+    break;
+  case 3:
+    if (queuedBufferId == 3) { // No queued buffer, just pick a non-visible one
+      bufferToReturn = (displayBufferId == 0 ? 1 : 0);
+    } else {  // A buffer is queued, a buffer is displayed, the sum of all buffer IDs is always 3 - find the one that remains.
+      bufferToReturn = 3 - (displayBufferId + queuedBufferId);
+    }
+    break;
+  }
+  return (void*)((uintptr_t)map.get() + bufferToReturn * (xres * yres * 4));
 }
 
-uint32_t *BgaFramebuffer::getBufferLine(size_t lineno) {
-  return (uint32_t*)VIRTUAL_ADDRESS + (bufferId * yres + xres) * lineno;
-}
-/*
-void platform_set_current_buffer(size_t buffer) {
-  write_reg(YOffset, buffer*yres);
-}
-*/
 #endif
 

@@ -2,19 +2,30 @@
 
 #include "pci.h"
 #include <cstddef>
+#include "map.h"
+#include "Screen.h"
 
 #ifdef __x86_64__
 
 class BgaFramebuffer {
 public:
+  struct BgaScreen : public Screen {
+    BgaScreen(pcidevice dev, void* edid);
+    bool SetActiveResolution(const Resolution& res, size_t bufferCount) override;
+    future<void> QueueBuffer(void*) override;
+    void* GetFreeBuffer() override;
+    uint16_t xres, yres;
+    uint8_t displayBufferId, queuedBufferId, bufferCount;
+    mapping map;
+    void* activeScreen;
+    uintptr_t bochsregs, qemuregs;
+  };
   BgaFramebuffer(pcidevice dev);
-  void setResolution(size_t x, size_t y, size_t bufferCount);
-  size_t getWidth();
-  size_t getHeight();
-  uint32_t *getBufferLine(size_t lineno);
+  size_t getScreenCount() { return 1; }
+  Screen* getScreen(size_t n) { return &screen; }
 private:
-  size_t xres, yres, bufferId;
-  uint32_t *buffer;
+  mapping regs;
+  BgaScreen screen;
 };
 
 #endif

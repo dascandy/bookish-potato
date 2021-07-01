@@ -1,4 +1,4 @@
-#include "rpi/mailbox.h"
+#include "mailbox.h"
 #include "debug.h"
 #include "io.h"
 /*

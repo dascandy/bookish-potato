@@ -37,6 +37,7 @@ static rpi_entry models[] = {
   0xa020d3, "3B+", "1.3", 1024, "Sony UK", 0x3F000000,
   0xa02100, "CM3+", "1.0", 1024, "Sony UK", 0x3F000000,
   0xa03111, "4B", "1.1", 1024, "Sony UK", 0xFE000000,
+  0xa03140, "CM4", "1.0", 1024, "Sony UK", 0xFE000000,
   0xa21041, "2B", "1.1", 1024, "Embest", 0x3F000000,
   0xa22042, "2B (with BCM2837)", "1.2", 1024, "Embest", 0x3F000000,
   0xa22082, "3B", "1.2", 1024, "Embest", 0x3F000000,
@@ -46,8 +47,15 @@ static rpi_entry models[] = {
   0xa52082, "3B", "1.2", 1024, "Stadium", 0x3F000000,
   0xb03111, "4B", "1.1", 2048, "Sony UK", 0xFE000000,
   0xb03112, "4B", "1.2", 2048, "Sony UK", 0xFE000000,
+  0xb03114, "4B", "1.4", 2048, "Sony UK", 0xFE000000,
+  0xb03140, "CM4", "1.0", 2048, "Sony UK", 0xFE000000,
   0xc03111, "4B", "1.1", 4096, "Sony UK", 0xFE000000,
   0xc03112, "4B", "1.2", 4096, "Sony UK", 0xFE000000,
+  0xc03114, "4B", "1.4", 4096, "Sony UK", 0xFE000000,
+  0xc03130, "Pi 400", "1.0", 4096, "Sony UK", 0xFE000000,
+  0xc03140, "CM4", "1.0", 4096, "Sony UK", 0xFE000000,
+  0xd03114, "4B", "1.4", 8192, "Sony UK", 0xFE000000,
+  0xd03140, "CM4", "1.0", 8192, "Sony UK", 0xFE000000,
 };
 
 static uintptr_t get_mmio_base() {

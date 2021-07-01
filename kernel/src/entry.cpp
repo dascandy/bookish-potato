@@ -4,7 +4,7 @@
 #include "bookish_potato_version.h"
 #include "interrupt.h"
 #include "debug.h"
-#include "acpi.h"
+#include "x86/acpi.h"
 #include "pci.h"
 #include "future.h"
 #include "freepage.h"
@@ -148,9 +148,9 @@ extern "C" void kernel_secondary_cpu() {
 }
 
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
+  asa_init();
   platform_init(platform_data, magic);
   set_utc_offset(1591473338000000 - get_timer_value());
-//  asa_init();
 /*
   while (1) {
     interrupt_check();
