@@ -24,14 +24,14 @@ struct Hpet {
     clkperiodInFs = (uint32_t)(caps >> 32);
     uint16_t vendorid = (uint16_t)(caps >> 16);
     if (clkperiodInFs < 1000000) {
-      debug("FATAL: found HPET device with clock indicated above 1GHz.\n");
+      debug("[HPET] FATAL: found HPET device with clock indicated above 1GHz.\n");
       while (1) {}
     }
-    debug("found HPET timer rev {} with {} timers\n", caps & 0xFF, 1 + ((caps >> 8) & 0x1F));
+    debug("[HPET] found HPET timer rev {} with {} timers\n", caps & 0xFF, 1 + ((caps >> 8) & 0x1F));
     uint64_t confreg = mmio_read<uint64_t>(base + HpetGenCfg);
-    debug("clock period of {} fs, legacy {s}{s}\n", clkperiodInFs, (confreg & 2) ? "enabled" : "disabled", (confreg & 1) ? ", timer running" : "");
+    debug("[HPET] clock period of {} fs, legacy {s}{s}\n", clkperiodInFs, (confreg & 2) ? "enabled" : "disabled", (confreg & 1) ? ", timer running" : "");
     uint64_t timercaps = mmio_read<uint64_t>(base + HpetTimerConfig);
-    debug("timer caps: {s}{s}{s}\n", timercaps & 0x8000 ? " FSB" : "", timercaps & 0x20 ? " 64" : "", timercaps & 0x10 ? " rep" : "");
+    debug("[HPET] timer caps: {s}{s}{s}\n", timercaps & 0x8000 ? " FSB" : "", timercaps & 0x20 ? " 64" : "", timercaps & 0x10 ? " rep" : "");
     //mmio_write<uint64_t>(base + HpetTimerConfig, 
   }
   void set_interrupt(uint64_t nextTimeoutInUs) {

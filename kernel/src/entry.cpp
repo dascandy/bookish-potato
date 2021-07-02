@@ -44,15 +44,12 @@ struct mb1_memory {
 
 void mb1_init(mb1* data) {
   if (data->flags & 0x40) {
-    debug("MB1 has memory map\n");
-    debug("{x} {x}\n", data->mmap_addr, data->mmap_length);
+    debug("[PLAT] MB1 has memory map\n");
     size_t stride = *(uint32_t*)((uintptr_t)data->mmap_addr );
-    debug("{} stride\n", stride);
     if (stride < 20) stride = 24;
     size_t count = data->mmap_length / stride;
     for(size_t n = 0; n < count; n++) {
       mb1_memory* m = (mb1_memory*)((uintptr_t)data->mmap_addr + 4 + n * (stride + 4));
-      debug("{x} {x} {}\n", m->base_addr, m->length, m->type);
       if (m->type == 1) {
         uintptr_t start = m->base_addr;
         size_t length = m->length;
@@ -62,7 +59,7 @@ void mb1_init(mb1* data) {
           length -= toskip;
         }
         if (length & 0xFFF) length -= (length & 0xFFF);
-        debug("{x} {x}\n", start, length);
+        debug("[PLAT] Found {} pages at {x}\n", length / 4096, start);
         freepage_add_region(m->base_addr, m->length);
       }
     }
@@ -82,7 +79,7 @@ struct mb2 {
 void mb2_init(mb2* data) {
   mb2_entry* entry = (mb2_entry*)((char*)data + 8);
   while (entry->type != 0) {
-    debug("MB2 {} {}\n", entry->type, entry->size);
+    debug("[PLAT] MB2 {} {}\n", entry->type, entry->size);
     entry = (mb2_entry*)((char*)entry + entry->size);
   }
 }
@@ -94,7 +91,7 @@ void platform_init(void* platform_data, uint32_t magic) {
   } else if (magic == 0x36d76289) {
     mb2_init((mb2*)platform_data);
   } else {
-    debug("No MB data found, continuing without. This is broken, fyi.\n");
+    debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
   }
   acpi_init();
   pci_handle_bridge(0, 0);
@@ -113,12 +110,12 @@ future<void> f() {
   // Automatic after integrating network and ntp
   uint64_t currentTime = 1591308000000000ULL;
   set_utc_offset(currentTime - get_timer_value());
-  debug("set utc offset\n");
+  debug("[PLAT] set utc offset\n");
   while (true) {
     currentTime += 1000000;
     co_await wait_until(currentTime);
     uint64_t time = (currentTime - 1591308000000000ULL) / 1000000;
-    debug("{}:{}:{}     ", time / 3600, (time / 60) % 60, time % 60);
+    debug("[PLAT] {}:{}:{}     ", time / 3600, (time / 60) % 60, time % 60);
     debug("ctime = {}\n", currentTime);
   }
 }
@@ -134,10 +131,10 @@ void platform_init(void* platform_data, uint32_t magic) {
     gic_init(model.mmio_base);
   }
   timer_init(model.mmio_base);
-  debug("Found Raspberry Pi {s} (rev {s} with {}MB RAM, modelno {x} manufactured by {s}\n", model.modelname, model.revision, model.memory, model.modelno, model.manufacturer);
+  debug("[PLAT] Found Raspberry Pi {s} (rev {s} with {}MB RAM, modelno {x} manufactured by {s}\n", model.modelname, model.revision, model.memory, model.modelno, model.manufacturer);
 
   RpiFramebuffer* fb = RpiFramebuffer::Create();
-  debug("Found monitor {s} {s} serial# {s} at resolution {}x{}\n", fb->m.brand, fb->m.name, fb->m.serial, fb->m.width, fb->m.height);
+  debug("[PLAT] Found monitor {s} {s} serial# {s} at resolution {}x{}\n", fb->m.brand, fb->m.name, fb->m.serial, fb->m.width, fb->m.height);
 //  sd_init(model.mmio_base + 0x00300000);
 }
 

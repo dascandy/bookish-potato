@@ -5,44 +5,6 @@
 #include <span>
 #include <string>
 
-void Monitor::FromEdid(Monitor& m, s2::span<uint8_t> edid) {
-  /*
-  // TODO: validate
-  char brand[4] = { char('@' + ((edid[8] >> 2) & 0x1F)), char('@' + (((edid[8] << 3) | (edid[9] >> 5)) & 0x1F)), char('@' + ((edid[9]) & 0x1F)), 0 };
-  m.brand = translate(brand);
-  m.width_mm = edid[66] + ((edid[68] & 0xF0) << 4);
-  m.height_mm = edid[67] + ((edid[68] & 0xF) << 8);
-  m.width = edid[56] + ((edid[58] & 0xF0) << 4);
-  m.height = edid[59] + ((edid[61] & 0xF0) << 4);
-  for (size_t n = 0; n < 4; n++) {
-    if (edid[54 + 18 * n] == 0 && 
-        edid[55 + 18 * n] == 0 &&
-        edid[56 + 18 * n] == 0) {
-      switch(edid[57 + 18 * n]) {
-      case 0xFF:
-      {
-        uint8_t* b = edid.data() + 58 + 18*n;
-        uint8_t* e = b;
-        while (e - b != 13 && *e != 10) e++;
-        // TODO: transcode from CP437
-        m.serial = s2::string_view((const char*)b, (const char*)e);
-      }
-        break;
-      case 0xFC:
-      {
-        uint8_t* b = edid.data() + 58 + 18*n;
-        uint8_t* e = b;
-        while (e - b != 13 && *e != 10) e++;
-        // TODO: transcode from CP437
-        m.name = s2::string_view((const char*)b, (const char*)e);
-      }
-        break;
-      }
-    }
-  }
-  */
-}
-
 s2::span<uint8_t> RpiFramebuffer::ReadEdid(uint8_t* buffer) {
   uint32_t count = 0;
   do {
@@ -64,21 +26,7 @@ s2::span<uint8_t> RpiFramebuffer::ReadEdid(uint8_t* buffer) {
 RpiFramebuffer::RpiFramebuffer() {
   uint8_t buffer[1024];
   auto s = ReadEdid(buffer);
-  Monitor::FromEdid(m, s);
-
-  alignas(16) uint32_t gpu_request[64] = { 
-    148, 0, 
-    (uint32_t)MailboxProperty::GpuGetPitch, 4, 0, 0,
-    (uint32_t)MailboxProperty::GpuSetDisplaySize, 8, 0, m.width, m.height,
-    (uint32_t)MailboxProperty::GpuSetVirtualSize, 8, 0, m.width, m.height*2,
-    (uint32_t)MailboxProperty::GpuSetDepth, 4, 0, 32,
-    (uint32_t)MailboxProperty::GpuSetPixelOrder, 4, 0, 0,
-    (uint32_t)MailboxProperty::GpuSetVirtualOffset, 8, 0, 0, 0,
-    (uint32_t)MailboxProperty::GpuSetCursorState, 16, 0, 1, m.width/2, m.height/2, 0,
-    0
-  };
-  mailbox_send(8, gpu_request);
-  pitch = gpu_request[5];
+  screen = new RpiScreen(*this, s);
 }
 
 RpiFramebuffer* RpiFramebuffer::Create() {
@@ -86,13 +34,80 @@ RpiFramebuffer* RpiFramebuffer::Create() {
   return &r;
 }
 
-void RpiFramebuffer::SetMousePointer(uint32_t w, uint32_t h, const uint32_t* pixels, uint32_t hx, uint32_t hy) {
-  alignas(16) uint32_t gpu_request[64] = { 
-    148, 0, 
-    (uint32_t)MailboxProperty::GpuSetCursorInfo, 24, 0, w, h, 0, (uint32_t)(uintptr_t)pixels, hx, hy,
+RpiFramebuffer::RpiScreen::RpiScreen(RpiFramebuffer& fb, s2::span<const uint8_t> edid) 
+: Screen(edid)
+, fb(fb)
+{
+  debug("[RPI] Found Raspberry Pi framebuffer\n");
+  Register();
+}
+
+bool RpiFramebuffer::RpiScreen::SetActiveResolution(const Resolution& res, size_t bufferCount) {
+  alignas(16) uint32_t gpu_request[] = { 
+    12 + 16 + 20 + 20 + 20 + 16 + 16 + 20, 0, 
+    (uint32_t)MailboxProperty::GpuGetPitch, 4, 0, 0,
+    (uint32_t)MailboxProperty::GpuAllocateBuffer, 8, 0, 4096, 0,
+    (uint32_t)MailboxProperty::GpuSetDisplaySize, 8, 0, res.width, res.height,
+    (uint32_t)MailboxProperty::GpuSetVirtualSize, 8, 0, res.width, res.height*(uint32_t)bufferCount,
+    (uint32_t)MailboxProperty::GpuSetDepth, 4, 0, 32,
+    (uint32_t)MailboxProperty::GpuSetPixelOrder, 4, 0, 0,
+    (uint32_t)MailboxProperty::GpuSetVirtualOffset, 8, 0, 0, 0,
     0
   };
   mailbox_send(8, gpu_request);
+  this->bufferCount = bufferCount;
+  xres = res.width;
+  yres = res.height;
+  pitch = gpu_request[5];
+  buffer_base = gpu_request[9];
+  buffer_size = gpu_request[10];
+  debug("[RPI] Set resolution to {}x{}, buffer allocated at 0x{x} size 0x{x}\n", res.width, res.height, buffer_base, buffer_size);
+  currentResolution = res;
+  return true;
+}
+
+future<void> RpiFramebuffer::RpiScreen::QueueBuffer(void* ptr) {
+  switch(bufferCount) {
+  case 1:
+    return {};
+  case 3:
+    // Have no way to detect vsync on rpi graphics device, just use as double-buffered
+  case 2:
+    if ((uintptr_t)ptr == buffer_base) {
+      displayBufferId = 1;
+    } else {
+      displayBufferId = 0;
+    }
+    alignas(16) uint32_t gpu_request[64] = { 
+      32, 0, 
+      (uint32_t)MailboxProperty::GpuSetVirtualOffset, 8, 0, 0, (uint32_t)(displayBufferId * yres),
+      0
+    };
+    mailbox_send(8, gpu_request);
+    break;
+  }
+  return {};
+}
+
+void* RpiFramebuffer::RpiScreen::GetFreeBuffer() {
+  uint8_t bufferToReturn;
+  switch(bufferCount) {
+  default:
+  case 1:
+    bufferToReturn = 0;
+    break;
+  case 2:
+    bufferToReturn = 1 - displayBufferId;
+    break;
+  case 3:
+    if (queuedBufferId == 3) { // No queued buffer, just pick a non-visible one
+      bufferToReturn = (displayBufferId == 0 ? 1 : 0);
+    } else {  // A buffer is queued, a buffer is displayed, the sum of all buffer IDs is always 3 - find the one that remains.
+      bufferToReturn = 3 - (displayBufferId + queuedBufferId);
+    }
+    break;
+  }
+  return (void*)(buffer_base + bufferToReturn * (xres * yres * 4));
 }
 
 

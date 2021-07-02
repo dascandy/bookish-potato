@@ -128,7 +128,7 @@ PciDevice* pci_find_driver(pcidevice dev, uint16_t vendor, uint16_t device, uint
 }
 
 void pci_debug_print_device(uint16_t vendor, uint16_t device, uint32_t devClass) {
-  debug("found PCI vid={4x}", vendor);
+  debug("[PCI] found PCI vid={4x}", vendor);
   if (vendor == 0x8086) debug("(intel)");
   else if (vendor == 0x10EC) debug("(realtek)");
   else if (vendor == 0x1234) debug("(qemu)");
@@ -170,7 +170,7 @@ void pci_debug_print_device(uint16_t vendor, uint16_t device, uint32_t devClass)
 
 PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid) {
   PciBridge* bridge = new PciBridge(dev, subbusid);
-  debug("bridge starting\n");
+  debug("[PCI] bridge starting\n");
   pci_detect([](pcidevice dev){
     uint32_t vendor_device = pciread32(dev, 0);
     uint16_t device = vendor_device >> 16;
@@ -191,7 +191,7 @@ PciDevice* pci_handle_bridge(pcidevice dev, uint8_t subbusid) {
     debug("\n");
     return pci_find_driver(dev, vendor, device, devClass);
   }, subbusid, bridge);
-  debug("bridge ending\n");
+  debug("[PCI] bridge ending\n");
   return bridge;
 }
 

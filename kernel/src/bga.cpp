@@ -34,8 +34,7 @@ BgaFramebuffer::BgaScreen::BgaScreen(pcidevice dev, void* edid)
 , bochsregs((uintptr_t)edid + 0x500)
 , qemuregs((uintptr_t)edid + 0x400)
 {
-  mmio_write<uint16_t>(bochsregs, 0xb0c5);
-  debug("Found Bochs graphics adapter model {x}\n", mmio_read<uint16_t>(bochsregs));
+  debug("[BGA] Found Bochs graphics adapter model {x}\n", mmio_read<uint16_t>(bochsregs));
   Register();
 }
 

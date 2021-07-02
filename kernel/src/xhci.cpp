@@ -205,12 +205,13 @@ XhciDevice::XhciDevice(pcidevice dev)
 
 */
   //Work on ports
-  debug("XHCI controller enabled, {} ports\n", maxports);
+  debug("[XHCI] controller enabled, {} ports\n", maxports);
   for (size_t n = 0; n < maxports; ++n)
   {
     uint64_t op_port = opregs + 0x400 + n*16;
     uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
     if (sc & 1) {
+      debug("[XHCI] Found device on port {}\n", n);
       devices[n] = new XhciUsbDevice(this, n);
     }
   }

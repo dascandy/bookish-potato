@@ -143,7 +143,7 @@ Screen::Screen(s2::span<const uint8_t> edid) {
 
   supportedResolutions.push_back({width, height, PixelFormat::RGBX_8888});
   dotsPerInch = uint32_t(25.4 * width / widthMm);
-  debug("Found screen {} {} #{} ({} dpi) of {}x{} mm with {}x{} pixels\n", manufacturer, name, serialno, dotsPerInch, widthMm, heightMm, width, height);
+  debug("[SCR] Found screen {} {} #{} ({} dpi) of {}x{} mm with {}x{} pixels\n", manufacturer, name, serialno, dotsPerInch, widthMm, heightMm, width, height);
 }
 
 // Pretend to be a 23" 1080p screen, a 46" 4K screen or a 15.3" 720p screen

@@ -16,6 +16,7 @@ enum class MailboxProperty : uint32_t {
   GetTemperature = 0x30006,
 
   GetEDIDBlock = 0x30020,
+  GpuAllocateBuffer = 0x40001,
   GpuSetDisplaySize = 0x48003,
   GpuSetVirtualSize = 0x48004,
   GpuSetDepth = 0x48005,

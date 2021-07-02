@@ -20,11 +20,11 @@ struct ACPIHeader {
 static_assert(sizeof(ACPIHeader) == 36);
 
 void parseMadt(const ACPIHeader* table) {
-  debug("Found MADT at {} size {}\n", table, table->Length);
+  debug("[ACPI] Found MADT at {} size {}\n", table, table->Length);
 }
 
 void parseFacp(const ACPIHeader* table) {
-  debug("Found FACP at {} size {}\n", table, table->Length);
+  debug("[ACPI] Found FACP at {} size {}\n", table, table->Length);
 }
 
 struct hpet {
@@ -39,13 +39,13 @@ struct hpet {
 };
 
 void parseHpet(const ACPIHeader* table) {
-  debug("Found HPET at {} size {}\n", table, table->Length);
+  debug("[ACPI] Found HPET at {} size {}\n", table, table->Length);
   hpet* hp = (hpet*)(table + 1);
   timer_init(hp->address);
 }
 
 void parseMcfg(const ACPIHeader* table) {
-  debug("Found MCFG at {} size {}\n", table, table->Length);
+  debug("[ACPI] Found MCFG at {} size {}\n", table, table->Length);
 }
 
 void tryAcpiTable(uintptr_t address) {
@@ -72,7 +72,7 @@ void tryAcpiTable(uintptr_t address) {
       parseMcfg(table);
       break;
     default:
-      debug("Found unknown ACPI table {} at {} size {}\n", s2::string_view(table->Signature, table->Signature + 4), table, table->Length);
+      debug("[ACPI] Found unknown ACPI table {} at {} size {}\n", s2::string_view(table->Signature, table->Signature + 4), table, table->Length);
       break;
   }
 }
@@ -83,7 +83,7 @@ void parseSdt(uintptr_t address) {
   ACPIHeader* table = (ACPIHeader*)sdt.get();
   const T* start = (const T*)(table+1);
   const T* end = start + (table->Length - sizeof(ACPIHeader)) / sizeof(T);
-  debug("start {} {} end {} size {}\n", sdt.get(), start, end, table->Length);
+  debug("[ACPI] start {} {} end {} size {}\n", sdt.get(), start, end, table->Length);
   for (; start != end; ++start) {
     tryAcpiTable((uintptr_t)*start);
   }
@@ -113,17 +113,16 @@ bool check_rsd_ptr(const uint8_t* ptr) {
   if (csum != 0) validXsdt = false;
   if (descriptor->Length < 40) validXsdt = false;
   if (validXsdt) {
-    debug("found XSDT at {}\n", ptr);
+    debug("[ACPI] found XSDT at {}\n", ptr);
     parseSdt<uint64_t>(((uintptr_t)descriptor->XsdtAddress_high << 32) | (descriptor->XsdtAddress_low));
   } else {
-    debug("found RSDT at {}\n", ptr);
+    debug("[ACPI] found RSDT at {}\n", ptr);
     parseSdt<uint32_t>((uintptr_t)descriptor->RsdtAddress);
   }
   return true;
 }
 
 void acpi_init() {
-  debug("ACPI dance\n");
   mapping bios(0xE0000, 0x20000, ReadOnlyMemory);
   const uint8_t* start = (const uint8_t*)bios.get(), *end = (const uint8_t*)bios.get() + 0x20000;
   for (; start != end; start += 16) {
