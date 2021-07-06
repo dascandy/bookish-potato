@@ -70,7 +70,7 @@ namespace std::experimental {
       return *this;
     }
 
-    static constexpr coroutine_handle from_address(void* addr) {
+    static constexpr coroutine_handle from_address(void* addr) noexcept {
       return coroutine_handle{addr};
     }
 
@@ -92,17 +92,17 @@ namespace std::experimental {
   noop_coroutine_handle noop_coroutine() noexcept;
 
   struct suspend_never {
-    bool await_ready() {
+    bool await_ready() noexcept {
         return true;
     }
-    void await_suspend(std::experimental::coroutine_handle<> awaiting) {}
-    void await_resume() {}
+    void await_suspend(std::experimental::coroutine_handle<> awaiting) noexcept {}
+    void await_resume() noexcept {}
   };
   struct suspend_always {
-    bool await_ready() {
+    bool await_ready() noexcept {
         return false;
     }
-    void await_suspend(std::experimental::coroutine_handle<> awaiting) {}
-    void await_resume() {}
+    void await_suspend(std::experimental::coroutine_handle<> awaiting) noexcept {}
+    void await_resume() noexcept {}
   };
 }
