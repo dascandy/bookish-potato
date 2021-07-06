@@ -146,6 +146,12 @@ uint64_t platform_unmap(void* addr) {
   return p;
 }
 
+mapping::mapping()
+: bytecount(0)
+, virtaddr(0)
+, offset(0)
+{}
+
 mapping::mapping(uintptr_t address, size_t bytes, MappingUse use) 
 : bytecount(bytes)
 , virtaddr(asa_alloc(bytes))
@@ -199,11 +205,32 @@ mapping::mapping(pcidevice dev, PciBars barno, MappingUse use)
   }
 }
 
+mapping& mapping::operator=(mapping&& rhs) {
+  bytecount = rhs.bytecount;
+  virtaddr = rhs.virtaddr;
+  offset = rhs.offset;
+  rhs.bytecount = 0;
+  rhs.virtaddr = 0;
+  rhs.offset = 0;
+  return *this;
+}
+
+mapping::mapping(mapping&& rhs) 
+: bytecount(rhs.bytecount)
+, virtaddr(rhs.virtaddr)
+, offset(rhs.offset)
+{
+  rhs.bytecount = 0;
+  rhs.virtaddr = 0;
+  rhs.offset = 0;
+}
+
 mapping::~mapping() {
   for (size_t n = 0; n < bytecount; n += 4096) {
     platform_unmap((void*)(virtaddr + n));
   }
-  asa_free(virtaddr, bytecount);
+  if (bytecount)
+    asa_free(virtaddr, bytecount);
 }
 
 void* mapping::get() {
