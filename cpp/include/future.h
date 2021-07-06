@@ -5,11 +5,13 @@
 #include <utility>
 #include <type_traits>
 
+template <typename T>
+struct promise;
+
 template<typename T>
 struct future {
-    struct promise;
-    using handle_type = std::experimental::coroutine_handle<promise>;
-    using promise_type = promise;
+    using handle_type = std::experimental::coroutine_handle<promise<T>>;
+    using promise_type = promise<T>;
     future() {}
     future(handle_type h)
     : coro(h) {
@@ -43,7 +45,8 @@ struct future {
 };
 
 template <typename T>
-struct alignas(alignof(T)) future<T>::promise {
+struct alignas(alignof(T)) promise {
+    using handle_type = std::experimental::coroutine_handle<promise<T>>;
     char value_storage[sizeof(T)];
     bool has_value = false;
     std::experimental::coroutine_handle<> awaiting = {};
@@ -54,6 +57,9 @@ struct alignas(alignof(T)) future<T>::promise {
     }
     auto get_return_object() {
         return future<T>{handle_type::from_promise(*this)};
+    }
+    auto get_future() {
+        return get_return_object();
     }
     auto initial_suspend() {
         return std::experimental::suspend_never{};
@@ -66,7 +72,7 @@ struct alignas(alignof(T)) future<T>::promise {
           has_value = true;
         return std::experimental::suspend_never{};
     }
-    auto final_suspend() {
+    auto final_suspend() noexcept {
         return std::experimental::suspend_never{};
     }
     void unhandled_exception() {
@@ -75,7 +81,8 @@ struct alignas(alignof(T)) future<T>::promise {
 };
 
 template <>
-struct future<void>::promise {
+struct promise<void> {
+    using handle_type = std::experimental::coroutine_handle<promise<void>>;
     bool has_value = false;
     std::experimental::coroutine_handle<> awaiting = {};
     promise() 
@@ -96,7 +103,7 @@ struct future<void>::promise {
           has_value = true;
         return std::experimental::suspend_never{};
     }
-    auto final_suspend() {
+    auto final_suspend() noexcept {
         return std::experimental::suspend_never{};
     }
     void unhandled_exception() {
