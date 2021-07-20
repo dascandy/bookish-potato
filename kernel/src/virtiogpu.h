@@ -11,7 +11,7 @@ public:
   struct VirtioGpuScreen : public Screen {
     VirtioGpuScreen(pcidevice dev, s2::span<const uint8_t> edid);
     bool SetActiveResolution(const Resolution& res, size_t bufferCount) override;
-    future<void> QueueBuffer(void*) override;
+    s2::future<void> QueueBuffer(void*) override;
     void* GetFreeBuffer() override;
   };
   VirtioGpu(pcidevice dev);

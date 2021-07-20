@@ -20,7 +20,7 @@ bool VirtioGpu::VirtioGpuScreen::SetActiveResolution(const Resolution& res, size
   return true;
 }
 
-future<void> VirtioGpu::VirtioGpuScreen::QueueBuffer(void* ptr) {
+s2::future<void> VirtioGpu::VirtioGpuScreen::QueueBuffer(void* ptr) {
   return {};
 }
 

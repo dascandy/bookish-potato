@@ -31,8 +31,10 @@ struct mapping {
   mapping(pcidevice dev, PciBars barno, MappingUse use = MappingUse::DeviceRegisters);
   mapping& operator=(mapping&&);
   mapping(mapping&&);
+  uint64_t to_physical(void* p);
   ~mapping();
   void* get();
+  uintptr_t address;
   uintptr_t virtaddr;
   size_t bytecount;
   size_t offset;

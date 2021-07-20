@@ -10,6 +10,11 @@ namespace s2 {
 template <typename T>
 class shared_ptr {
 public:
+  shared_ptr() 
+  : ptr(0)
+  , ctr(0)
+  {
+  }
   shared_ptr(T* ptr)
   : ptr(ptr)
   , ctr(new size_t)
@@ -21,6 +26,20 @@ public:
   , ctr(sp.ctr)
   {
     (*ctr)++;
+  }
+  shared_ptr(shared_ptr&& sp) 
+  : ptr(sp.ptr)
+  , ctr(sp.ctr)
+  {
+    sp.ptr = nullptr;
+    sp.ctr = nullptr;
+  }
+  shared_ptr& operator=(shared_ptr&& sp) {
+    ptr = sp.ptr;
+    ctr = sp.ctr;
+    sp.ptr = nullptr;
+    sp.ctr = nullptr;
+    return *this;
   }
   shared_ptr& operator=(const shared_ptr& sp) {
     if (ptr == sp.ptr) 
@@ -37,17 +56,23 @@ public:
     return *this;
   }
   ~shared_ptr() {
-    (*ctr)--;
-    if ((*ctr) == 0) {
-      delete ptr;
-      if ((size_t)ctr - sizeof(T) != (size_t)ptr)
-        delete ctr;
+    reset();
+  }
+  void reset() {
+    if (ctr) {
+      (*ctr)--;
+      if ((*ctr) == 0) {
+        delete ptr;
+        if ((size_t)ctr - sizeof(T) != (size_t)ptr)
+          delete ctr;
+      }
     }
     ptr = 0;
     ctr = 0;
   }
   T* operator->() const { return ptr; }
   T* get() const { return ptr; }
+  explicit operator bool() { return ptr != nullptr; }
 private:
   shared_ptr(T* p, size_t* c)
   : ptr(p)

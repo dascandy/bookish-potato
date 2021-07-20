@@ -1,0 +1,7 @@
+#pragma once
+
+#define assert(...) _assert((__VA_ARGS__), #__VA_ARGS__, __FILE__, __LINE__)
+
+void _assert(bool value, const char* text, const char* file, size_t line);
+
+

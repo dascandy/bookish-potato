@@ -184,7 +184,7 @@ void Cipher::Sha1::AddBlock(const uint8_t* data, size_t length) {
 #endif
 }
 
-std::vector<uint8_t> Cipher::Sha1::GetHash() {
-  return std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(state), reinterpret_cast<const uint8_t*>(state + 5));
+s2::vector<uint8_t> Cipher::Sha1::GetHash() {
+  return s2::vector<uint8_t>(reinterpret_cast<const uint8_t*>(state), reinterpret_cast<const uint8_t*>(state + 5));
 }
 

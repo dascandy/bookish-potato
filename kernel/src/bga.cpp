@@ -58,7 +58,7 @@ bool BgaFramebuffer::BgaScreen::SetActiveResolution(const Resolution& res, size_
   return true;
 }
 
-future<void> BgaFramebuffer::BgaScreen::QueueBuffer(void* ptr) {
+s2::future<void> BgaFramebuffer::BgaScreen::QueueBuffer(void* ptr) {
     uint8_t displayBufferId, queuedBufferId, bufferCount;
   switch(bufferCount) {
   case 1:

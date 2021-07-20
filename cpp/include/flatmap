@@ -4,13 +4,13 @@
 #include <utility>
 
 template <typename K, typename V>
-class flatmap : private std::vector<std::pair<const K, V>> {
+class flatmap : private s2::vector<std::pair<const K, V>> {
 public:
-  typedef typename std::vector<std::pair<const K, V>>::iterator iterator;
-  typedef typename std::vector<std::pair<const K, V>>::const_iterator const_iterator;
-  using std::vector<std::pair<const K, V>>::begin;
-  using std::vector<std::pair<const K, V>>::end;
-  using std::vector<std::pair<const K, V>>::size;
+  typedef typename s2::vector<std::pair<const K, V>>::iterator iterator;
+  typedef typename s2::vector<std::pair<const K, V>>::const_iterator const_iterator;
+  using s2::vector<std::pair<const K, V>>::begin;
+  using s2::vector<std::pair<const K, V>>::end;
+  using s2::vector<std::pair<const K, V>>::size;
   V &operator[](const K &key) {
     for (std::pair<const K, V> &p : *this) {
       if (p.first == key) return p.second;

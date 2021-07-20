@@ -149,12 +149,14 @@ uint64_t platform_unmap(void* addr) {
 mapping::mapping()
 : bytecount(0)
 , virtaddr(0)
+, address(0)
 , offset(0)
 {}
 
 mapping::mapping(uintptr_t address, size_t bytes, MappingUse use) 
 : bytecount(bytes)
 , virtaddr(asa_alloc(bytes))
+, address(address)
 , offset(address & 0xFFF)
 {
   if (offset) {
@@ -168,7 +170,7 @@ mapping::mapping(uintptr_t address, size_t bytes, MappingUse use)
 
 mapping::mapping(pcidevice dev, PciBars barno, MappingUse use) 
 {
-  uint64_t address = pciread32(dev, (int)barno * 4 + 0x10);
+  address = pciread32(dev, (int)barno * 4 + 0x10);
   switch (address & 0x7) {
     case 0x0:
       // 32-bit
@@ -208,9 +210,11 @@ mapping::mapping(pcidevice dev, PciBars barno, MappingUse use)
 mapping& mapping::operator=(mapping&& rhs) {
   bytecount = rhs.bytecount;
   virtaddr = rhs.virtaddr;
+  address = rhs.address;
   offset = rhs.offset;
   rhs.bytecount = 0;
   rhs.virtaddr = 0;
+  rhs.address = 0;
   rhs.offset = 0;
   return *this;
 }
@@ -218,10 +222,12 @@ mapping& mapping::operator=(mapping&& rhs) {
 mapping::mapping(mapping&& rhs) 
 : bytecount(rhs.bytecount)
 , virtaddr(rhs.virtaddr)
+, address(rhs.address)
 , offset(rhs.offset)
 {
   rhs.bytecount = 0;
   rhs.virtaddr = 0;
+  rhs.address = 0;
   rhs.offset = 0;
 }
 
@@ -235,6 +241,11 @@ mapping::~mapping() {
 
 void* mapping::get() {
   return reinterpret_cast<void*>(virtaddr + offset);
+}
+
+uint64_t mapping::to_physical(void* p) {
+  uintptr_t virt = (uintptr_t)p;
+  return virt - virtaddr + address;
 }
 
 

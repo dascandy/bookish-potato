@@ -1,0 +1,33 @@
+#pragma once
+
+namespace s2 {
+
+struct mutex {
+  void lock();
+  void unlock();
+};
+
+template <typename T>
+struct unique_lock {
+  unique_lock(T& m)
+  : mutex(m)
+  {
+    mutex.lock();
+  }
+  ~unique_lock() 
+  {
+    mutex.unlock();
+  }
+  T& mutex;
+};
+
+struct condition_variable {
+  template <typename L, typename F>
+  void wait(L&& lock, F&& function) {
+  }
+  void notify_one() {}
+  void notify_all() {}
+};
+
+}
+

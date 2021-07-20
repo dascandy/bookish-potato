@@ -8,7 +8,7 @@ namespace Ui {
     void AddScreen(Screen* screen);
     void RemoveScreen(Screen* screen);    
     static Compositor& Instance();
-    std::vector<Screen*> screens;
+    s2::vector<Screen*> screens;
   };
 };
 

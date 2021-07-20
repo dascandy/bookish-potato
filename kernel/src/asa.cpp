@@ -8,7 +8,7 @@ struct asa {
   size_t length;
 };
 static auto& asas() {
-  static std::vector<asa> asas;
+  static s2::vector<asa> asas;
   return asas;
 }
 

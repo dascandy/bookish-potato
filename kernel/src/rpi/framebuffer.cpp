@@ -66,7 +66,7 @@ bool RpiFramebuffer::RpiScreen::SetActiveResolution(const Resolution& res, size_
   return true;
 }
 
-future<void> RpiFramebuffer::RpiScreen::QueueBuffer(void* ptr) {
+s2::future<void> RpiFramebuffer::RpiScreen::QueueBuffer(void* ptr) {
   switch(bufferCount) {
   case 1:
     return {};

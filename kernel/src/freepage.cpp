@@ -14,13 +14,38 @@ static free_page_list* head = nullptr;
 
 uint64_t freepage_get() {
   free_page_list* c = head;
-  uint64_t page = c->address + 4096 * c->pagecount;
   c->pagecount--;
+  uint64_t page = c->address + 4096 * c->pagecount;
   if (!c->pagecount) {
     head = c->next;
     delete c;
   }
   return page;
+}
+
+enum class DmaType {
+  Unrestricted,
+  Bit32,
+};
+
+static bool matchesDmaType(uint64_t address, size_t pagecount, DmaType type) {
+  switch(type) {
+  default:
+  case DmaType::Unrestricted: return true;
+  case DmaType::Bit32: return (address < 0x100000000) && (address + pagecount * 4096 < 0x100000000);
+  }
+}
+
+// TODO: make it do some work in case there's no range available
+uint64_t freepage_get_range(size_t pagecount, DmaType type) {
+  free_page_list* c = head;
+  while (c && (c->pagecount <= pagecount || not matchesDmaType(c->address, pagecount, type))) {
+    c = c->next;
+  }
+  // TODO: make it do something better in this case
+  if (!c) return 0;
+  c->pagecount -= pagecount;
+  return c->address + 4096 * c->pagecount;
 }
 
 void freepage_add_region(uint64_t start, size_t length) {

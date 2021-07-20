@@ -2,8 +2,9 @@
 
 #include <cstdlib>
 #include <new>
+#include <utility>
 
-namespace std {
+namespace s2 {
   template<typename T>
   class vector {
   protected:
@@ -64,7 +65,7 @@ namespace std {
       T* newbuf = static_cast<T*>(malloc(newCapacity * sizeof(T)));
       // TODO: exception safety
       for (size_t n = 0; n < size_; n++) {
-        new(&newbuf[n])T(buf[n]);
+        new(&newbuf[n])T(s2::move(buf[n]));
       }
       // point of no return
       for (size_t n = 0; n < size_; n++) {
@@ -92,7 +93,7 @@ namespace std {
     void push_back(T elem) {
       if (capacity_ < 8) reserve(8);
       if (size_ + 1 > capacity_) reserve(capacity_*2);
-      new(&buf[size_++])T(elem);
+      new(&buf[size_++])T(s2::move(elem));
     }
     template <typename... Args>
     void emplace_back(Args... args) {

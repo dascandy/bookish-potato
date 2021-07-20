@@ -33,5 +33,10 @@ void debug_field(int64_t value, s2::string_view spec) {
   debug_field((uint64_t)value, spec);
 }
 
-
+void _assert(bool value, const char* text, const char* file, size_t line) {
+  if (!value) {
+    debug("{s}:{}: ASSERT FAILED: {s}\n", file, line, text);
+    while (1) {}
+  }
+}
 

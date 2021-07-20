@@ -5,6 +5,8 @@
 #include "map.h"
 #include <cstring>
 #include "freepage.h"
+#include "future.h"
+#include "usb.h"
 
 constexpr uint64_t CR_CAPLENGTH = 0;
 constexpr uint64_t CR_HCIVERSION = 2;
@@ -28,6 +30,7 @@ constexpr uint64_t RT_ERSTSZ = 0x28;
 constexpr uint64_t RT_ERDP = 0x38;
 constexpr uint64_t RT_ERSTBA = 0x30;
 constexpr uint64_t RT_IMAN = 0x20;
+constexpr uint64_t RT_IMOD = 0x24;
 
 constexpr uint64_t P_SC = 0x00;
 constexpr uint64_t P_PMSC = 0x04;
@@ -36,30 +39,46 @@ constexpr uint64_t P_LI = 0x08;
 constexpr uint64_t RT_USBSTS_HCH = 0x1;
 constexpr uint64_t RT_USBCMD_RUN = 0x00000001;
 constexpr uint64_t RT_USBCMD_RESET = 0x00000002;
+constexpr uint64_t RT_USBCMD_INTE = 0x00000004;
 
-/*
-void disable_efi() {
-  uint32_t legacy = findExtendedCap(XHCI_ECAP_LEGSUP);
-  if (legacy != 0)
-  {
-    uint32_t legreg = readCapabilityRegister(legacy, 32);
-    legreg |= (1 << 24);
-    writeCapabilityRegister(legacy, legreg, 32);
-    while (1)
-    {
-      legreg = readCapabilityRegister(legacy, 32);
-      if (((legreg & (1 << 24)) != 0) && ((legreg & (1 << 16)) == 0))
-        break;
-    }
-    kprintf(u"Taken control of XHCI from firmware\n");
-  }
-  //Disable SMIs
-  uint32_t legctlsts = readCapabilityRegister(legacy + 4, 32);
-  legctlsts &= XHCI_LEGCTLSTS_DISABLE_SMI;
-  legctlsts |= XHCI_LEGCTLSTS_EVENTS_SMI;
-  writeCapabilityRegister(legacy + 4, legctlsts, 32);
-}
-*/
+enum : uint8_t {
+  XHCI_COMPLETION_INVALID = 0,
+  XHCI_COMPLETION_SUCCESS = 1,
+  XHCI_COMPLETION_DATA_BUFFER_ERROR = 2,
+  XHCI_COMPLETION_BABBLE_DETECTED_ERROR = 3,
+  XHCI_COMPLETION_USB_TRANSACTION_ERROR = 4,
+  XHCI_COMPLETION_TRB_ERROR = 5,
+  XHCI_COMPLETION_STALL_ERROR = 6,
+  XHCI_COMPLETION_RESOURCE_ERROR = 7,
+  XHCI_COMPLETION_BANDWIDTH_ERROR = 8,
+  XHCI_COMPLETION_NO_SLOTS_AVAILABLE_ERROR = 9,
+  XHCI_COMPLETION_INVALID_STREAM_TYPE_ERROR = 10,
+  XHCI_COMPLETION_SLOT_NOT_ENABLED_ERROR = 11,
+  XHCI_COMPLETION_ENDPOINT_NOT_ENABLED_ERROR = 12,
+  XHCI_COMPLETION_SHORT_PACKET = 13,
+  XHCI_COMPLETION_RING_UNDERRUN = 14,
+  XHCI_COMPLETION_RING_OVERRUN = 15,
+  XHCI_COMPLETION_VF_EVENT_RING_FULL_ERROR = 16,
+  XHCI_COMPLETION_PARAMETER_ERROR = 17,
+  XHCI_COMPLETION_BANDWIDTH_OVERRUN_ERROR = 18,
+  XHCI_COMPLETION_CONTEXT_STATE_ERROR = 19,
+  XHCI_COMPLETION_NO_PING_RESPONSE_ERROR = 20,
+  XHCI_COMPLETION_EVENT_RING_FULL_ERROR = 21,
+  XHCI_COMPLETION_INCOMPATIBLE_DEVICE_ERROR = 22,
+  XHCI_COMPLETION_MISSED_SERVICE_ERROR = 23,
+  XHCI_COMPLETION_COMMAND_RING_STOPPED = 24,
+  XHCI_COMPLETION_COMMAND_ABORTED = 25,
+  XHCI_COMPLETION_STOPPED = 26,
+  XHCI_COMPLETION_STOPPED_LENGTH_INVALID = 27,
+  XHCI_COMPLETION_STOPPED_SHORT_PACKET = 28,
+  XHCI_COMPLETION_MAX_EXIT_LATENCY_TOO_LARGE_ERROR = 29,
+  XHCI_COMPLETION_ISOCH_BUFFER_OVERRUN = 31,
+  XHCI_COMPLETION_EVENT_LOST_ERROR = 32,
+  XHCI_COMPLETION_UNDEFINED_ERROR = 33,
+  XHCI_COMPLETION_INVALID_STREAM_ID_ERROR = 34,
+  XHCI_COMPLETION_SECONDARY_BANDWIDTH_ERROR = 35,
+  XHCI_COMPLETION_SPLIT_TRANSACTION_ERROR = 36,
+};
 
 struct xhci_speed {
   void debugprint() {
@@ -88,6 +107,48 @@ xhci_speed vtbl[16] = {
   { true, 3, 20 },
 };
 
+struct EndpointContext {
+  uint32_t a, b;
+  uint64_t tr_deq_ptr;
+  uint32_t average;
+  uint32_t res[3];
+};
+static_assert(sizeof(EndpointContext) == 0x20);
+
+struct EndpointContextPair {
+  EndpointContext out;
+  EndpointContext in;
+};
+
+static_assert(sizeof(EndpointContextPair) == 0x40);
+
+struct DevicePort {
+  uint32_t route;
+  uint32_t ports;
+  uint32_t parent;
+  uint32_t device;
+  uint32_t pad[4];
+  EndpointContext control;
+  EndpointContextPair eps[15];
+};
+
+static_assert(sizeof(DevicePort) == 0x400);
+
+struct InputContext {
+  uint32_t d, a;
+  uint32_t pad1[6];
+  DevicePort port;
+  DeviceDescriptor device_descriptor;
+  uint8_t loopIndex;
+
+  uint8_t pad[0x3cd];
+  xhci_command loop[128];
+};
+
+static_assert(sizeof(InputContext) == 0x1000);
+
+
+
 static constexpr const char* plstab[16] = {
   "U0",
   "U1",
@@ -107,187 +168,329 @@ static constexpr const char* plstab[16] = {
   "Resume",
 };
 
-void extractPsids(pcidevice dev) {
+namespace {
 
-}
+enum {
+  TRB_FLAG_C = 0x1,
+  TRB_FLAG_TC = 0x2,
+  TRB_FLAG_ENT = 0x2,
+  TRB_FLAG_ED = 0x4,
+  TRB_FLAG_ISP = 0x4,
+  TRB_FLAG_NS = 0x8,
+  TRB_FLAG_CH = 0x10,
+  TRB_FLAG_IOC = 0x20,
+  TRB_FLAG_IDT = 0x40,
+  TRB_FLAG_TSP = 0x200,
+  TRB_FLAG_DC = 0x200,
+  TRB_FLAG_BSR = 0x200,
+  TRB_FLAG_BEI = 0x200,
 
-uint64_t XhciDevice::CreateContext(uint32_t scratchcount) {
-  uint64_t page = freepage_get();
-  mapping dcb(page, 0x1000, DeviceMemory);
-  memset(dcb.get(), 0, 0x1000);
+  TRB_FLAG_SIA = 0x80000000,
+  TRB_TYPE_NORMAL = 0x0400,
+  TRB_TYPE_SETUP_STAGE = 0x0800,
+  TRB_TYPE_DATA_STAGE = 0x0c00,
+  TRB_TYPE_STATUS_STAGE = 0x1000,
+  TRB_TYPE_ISOCH = 0x1400,
+  TRB_TYPE_LINK = 0x1800,
+  TRB_TYPE_EVENT_DATA = 0x1c00,
+  TRB_TYPE_TRANSFER_NOOP = 0x2000,
 
-  uint64_t scratchpad_index = freepage_get();
-  mmio_write<uint64_t>((uintptr_t)dcb.get(), scratchpad_index);
+  TRB_TYPE_ENABLE_SLOT = 0x2400,
+  TRB_TYPE_DISABLE_SLOT = 0x2800,
+  TRB_TYPE_ADDRESS_DEVICE = 0x2c00,
+  TRB_TYPE_CONFIGURE_ENDPOINT = 0x3000,
+  TRB_TYPE_EVALUATE_CONTEXT = 0x3400,
+  TRB_TYPE_RESET_ENDPOINT = 0x3800,
+  TRB_TYPE_STOP_ENDPOINT = 0x3c00,
+  TRB_TYPE_TR_DEQUEUE_POINTER = 0x4000,
+  TRB_TYPE_RESET_DEVICE = 0x4400,
+  TRB_TYPE_COMMAND_NOOP = 0x5c00,
 
-  mapping index(scratchpad_index, 0x1000, DeviceMemory);
-  memset(index.get(), 0, 0x1000);
-  uint64_t* scratchpads = (uint64_t*)index.get();
-  for (size_t n = 0; n < scratchcount; n++) {
-    scratchpads[n] = freepage_get_zeroed();
-  }
-  return page;
-}
-
-struct xhci_command {
-	uint64_t a, b;
+  TRB_TYPE_TRANSFER = 0x8000,
+  TRB_TYPE_COMMAND_COMPLETION = 0x8400,
+  TRB_TYPE_PORT_STATUS_CHANGE = 0x8800,
+  TRB_TYPE_BANDWIDTH_REQUEST = 0x8c00,
+  TRB_TYPE_HOST_CONTROLLER = 0x9400,
+  TRB_TYPE_DEVICE_NOTIFICATION = 0x9800,
+  TRB_TYPE_MFINDEX_WRAP = 0x9c00,
 };
 
-static xhci_command create_enableslot_command(uint8_t slottype) {
-//  return { 0, XHCI_TRB_ENABLED | XHCI_TRB_TYPE(XHCI_TRB_TYPE_ENABLE_SLOT) | (slottype << 16) };
-	return {};
+static xhci_command EnableSlot() {
+  return { 0, 0, TRB_TYPE_ENABLE_SLOT };
 }
+
+static xhci_command AddressDevice(uint64_t inputContextPointer, uint8_t slotId) {
+  return { inputContextPointer, 0, ((uint32_t)slotId << 24) | TRB_TYPE_ADDRESS_DEVICE };
+}
+
+static xhci_command ConfigureEndpoint(uint64_t inputContextPointer, uint8_t slotId) {
+  return { inputContextPointer, 0, ((uint32_t)slotId << 24) | TRB_TYPE_CONFIGURE_ENDPOINT };
+}
+
+static xhci_command NormalTRB(uint64_t dataBuffer, uint32_t trbBytes, uint8_t td_size) {
+  return { dataBuffer, (td_size << 17) | (trbBytes), TRB_TYPE_NORMAL };
+}
+
+static xhci_command SetupStage(uint8_t requestType, uint8_t request, uint16_t value, uint16_t length, uint16_t index, uint8_t transferType) {
+  return {
+          ((uint64_t)length << 48) | 
+          ((uint64_t)index << 32) | 
+          ((uint64_t)value << 16) |
+          ((uint64_t)request << 8) |
+          requestType, 
+          8, 
+          ((uint32_t)transferType << 16) | TRB_TYPE_SETUP_STAGE };
+}
+
+static xhci_command DataStage(uint64_t dataBuffer, uint32_t trbBytes, uint8_t td_size, bool writeData) {
+  return { dataBuffer, (td_size << 17) | (trbBytes), TRB_TYPE_DATA_STAGE };
+}
+
+static xhci_command StatusStage() {
+  return { 0, 0, TRB_TYPE_STATUS_STAGE };
+}
+
+}
+
+s2::future<uint64_t> XhciDevice::RegisterStatus(uintptr_t address) {
+  s2::promise<uint64_t> rv;
+  s2::future<uint64_t> rv_v = rv.get_future();
+  callbacks.push_back({ address, s2::move(rv)});
+  debug("[XHCI] Registered handler for {x}\n", address);
+  return rv_v;
+}
+
+s2::future<uint64_t> XhciDevice::RunCommand(xhci_command cmd) {
+  xhci_command* commandRingPtr = (xhci_command*)commandRing.get();
+
+  // register handler for return
+  s2::future<uint64_t> rv = RegisterStatus(commandRingPhysical + currentCommand * 16);
+
+  commandRingPtr[currentCommand].pointer = cmd.pointer;
+  commandRingPtr[currentCommand].status = cmd.status;
+  commandRingPtr[currentCommand].control = cmd.control ^ currentFlag;
+  currentCommand++;
+  if (currentCommand == commandRingSize + 1) {
+    currentCommand = 0;
+    currentFlag ^= TRB_FLAG_C;
+  }
+
+  mmio_write<uint32_t>(doorbell, 0);
+
+  return rv;
+}
+
+void XhciDevice::HandleInterrupt() {
+  debug("[XHCI] Handle interrupts\n");
+  xhci_command* cmd = (xhci_command*)eventRing.get();
+  while (true) {
+    xhci_command& current = cmd[eventRingIndex];
+    if ((current.control & TRB_FLAG_C) != currentEventFlag) {
+      debug("[XHCI] No valid flag on event, quitting\n");
+      break;
+    }
+    debug("[XHCI] Found valid event {x} {x} {x}\n", current.pointer, current.status, current.control);
+    for (size_t n = 0; n < callbacks.size(); n++) {
+      if (current.pointer == callbacks[n].addr) {
+        debug("[XHCI] Informing handler\n");
+        callbacks[n].p.set_value(((uint64_t)current.status << 32) | current.control);
+        callbacks[n] = s2::move(callbacks.back());
+        callbacks.pop_back();
+        break;
+      }
+    }
+    eventRingIndex++;
+  }
+}
+
 
 XhciDevice::XhciDevice(pcidevice dev)
 : dev(dev)
 , bar1(dev, PciBars::Bar0)
 {
+  currentFlag = TRB_FLAG_C;
+  currentEventFlag = TRB_FLAG_C;
+  // Look up the registers for this controller
   cr = (uintptr_t)bar1.get();
   opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
   rr = cr + mmio_read<uint32_t>(cr + CR_RTSOFF);
   doorbell = cr + mmio_read<uint32_t>(cr + CR_DBOFF);
 
+  uint16_t hciversion = mmio_read<uint32_t>(cr + CR_CAPLENGTH) >> 16;
   uint32_t hcsparams1 = mmio_read<uint32_t>(cr + CR_HCSPARAMS1);
   uint32_t maxports = (hcsparams1 >> 24) & 0xFF;
   uint32_t maxinterrupters = (hcsparams1 >> 8) & 0x7FF;
   uint32_t maxslots = (hcsparams1 >> 0) & 0xFF;
+  debug("[XHCI] Initializing device version {x} (maxports {} maxslots {} maxinterrupters {})\n", hciversion, maxports, maxslots, maxinterrupters);
 
+// Reset device, wait for it to come back up
   pciwrite16(dev, 0x04, pciread16(dev, 0x04) | 6);
 
   mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) & ~RT_USBCMD_RUN);
   while ((mmio_read<uint32_t>(opregs + RT_USBSTS) & RT_USBSTS_HCH) == 0) {}
 
   mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) | RT_USBCMD_RESET);
-  // TODO: sleep(1us)
+  // TODO: co_await delay(1us);
   while ((mmio_read<uint32_t>(opregs + RT_USBCMD) & RT_USBCMD_RESET) != 0) {}
-
   mmio_write<uint32_t>(opregs + RT_DNCTRL, 0x02);
 
   uint32_t hcsparams2 = mmio_read<uint32_t>(cr + CR_HCSPARAMS2);
+
+  // Create scratchpad pages
   uint32_t scratchcount = ((hcsparams2 >> 27) & 0x1F) | ((hcsparams2 >> 16) & 0x3E0);
   if (scratchcount > 512)
-    debug("XHCI: requires more scratchpads than fit the index?\n");
-  uint64_t dcbPage = CreateContext(scratchcount);
+    debug("[XHCI] requires more scratchpads than fit the index?\n");
+  uint64_t scratchpad_index = freepage_get();
+  mapping index(scratchpad_index, 0x1000, DeviceMemory);
+  memset(index.get(), 0, 0x1000);
+  uint64_t* scratchpads = (uint64_t*)index.get();
+  debug("[XHCI] {} scratchpads\n", scratchcount);
+  for (size_t n = 0; n < scratchcount; n++) {
+    scratchpads[n] = freepage_get_zeroed();
+  }
+
+  // Create DCBAA page & slot backing stores, pass to device
+  uint64_t firstPage = freepage_get_range(maxslots / 4);
+  {
+    mapping fp(firstPage, maxslots * 1024, DeviceMemory);
+    memset(fp.get(), 0, maxslots * 1024);
+  }
+  uint64_t dcbPage = freepage_get_zeroed();
+  dcbaa = mapping(dcbPage, 0x1000, DeviceMemory);
+  mmio_write<uint64_t>((uintptr_t)dcbaa.get(), scratchpad_index);
+  for (size_t n = 0; n < maxslots / 4; n++) {
+    mmio_write<uint64_t>((uintptr_t)dcbaa.get() + 8 + 8*n, dcbPage + 0x1000 * n);
+  }
   mmio_write<uint64_t>(opregs + RT_DCBAAP, dcbPage);
+
+  // Map command ring
+  commandRingPhysical = freepage_get_zeroed();
+  commandRing = mapping(commandRingPhysical, 0x1000, DeviceMemory);
+  mmio_write<uint64_t>(opregs + RT_CRCR, commandRingPhysical + 1);
+
+  // Map event ring (1 page only, but requires indirection) and enable interrupts for when it gets events
+  uint64_t erst = freepage_get_zeroed();
+  mapping evtSegm(erst, 0x1000, DeviceMemory);
+  uint64_t eventRingPhysical = freepage_get_zeroed();
+  eventRing = mapping(eventRingPhysical, 0x1000, DeviceMemory);
+  mmio_write<uint64_t>((uintptr_t)evtSegm.get(), eventRingPhysical);
+  mmio_write<uint64_t>((uintptr_t)evtSegm.get() + 8, 0x100);
+  mmio_write<uint32_t>(rr + RT_ERSTSZ, 1);
+  mmio_write<uint64_t>(rr + RT_ERDP, eventRingPhysical);
+  mmio_write<uint64_t>(rr + RT_ERSTBA, erst);
+  mmio_write<uint32_t>(rr + RT_IMAN, 2);
+  mmio_write<uint32_t>(rr + RT_IMOD, 0);
+  
+  // Enable all device slots
   mmio_write<uint32_t>(opregs + RT_CONFIG, mmio_read<uint32_t>(opregs + RT_CONFIG) | maxslots);
 
-  uint64_t cr_page = freepage_get_zeroed();
-  mapping cr(cr_page, 0x1000, DeviceMemory); // or registers?
-  
-  uint64_t primaryEventRing = freepage_get_zeroed();
-  mapping pev(primaryEventRing, 0x1000, DeviceMemory);
+  mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) | RT_USBCMD_RUN | RT_USBCMD_INTE);
+  // Reset all pending interrupts
+  mmio_write<uint32_t>(opregs + RT_USBSTS, mmio_read<uint32_t>(opregs + RT_USBSTS));
 
-  mmio_write<uint64_t>(opregs + RT_CRCR, cr_page + 1);
-
-  uint64_t evtSeg = freepage_get_zeroed();
-  mapping evtSegm(evtSeg, 0x1000, DeviceMemory);
-  uint64_t evtSegList = freepage_get_zeroed();
-  mapping evtSegListm(evtSegList, 0x1000, DeviceMemory);
-
-  mmio_write<uint64_t>((uintptr_t)evtSegListm.get(), evtSeg);
-  mmio_write<uint64_t>((uintptr_t)evtSegListm.get() + 8, 0x100);
- 
-  // this is the place to write stuff to the event ring / read from it
-  uint64_t p = evtSeg;
-  mmio_write<uint32_t>(rr + RT_ERSTSZ, 1);
-  mmio_write<uint64_t>(rr + RT_ERDP, evtSegList | 8 | (mmio_read<uint64_t>(rr + RT_ERDP) & 0x7) );
-  mmio_write<uint64_t>(rr + RT_ERSTBA, evtSegList);
-  mmio_write<uint32_t>(rr + RT_IMAN, mmio_read<uint32_t>(rr + RT_IMAN));
-
-  mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) | RT_USBCMD_RUN);
-
-  /*
-  Runtime.Interrupter(0).IMAN.InterruptEnable = 1;
-  Operational.USBCMD.INTE = 1;
-  //Just make sure we don't miss interrupts
-  Runtime.Interrupter(0).IMAN = Runtime.Interrupter(0).IMAN;
-  Runtime.Interrupter(0).IMOD.InterruptInterval = 4000;
-  Operational.USBSTS = Operational.USBSTS;
-
-*/
   //Work on ports
-  debug("[XHCI] controller enabled, {} ports\n", maxports);
+  debug("[XHCI] controller enabled\n", maxports);
   for (size_t n = 0; n < maxports; ++n)
   {
-    uint64_t op_port = opregs + 0x400 + n*16;
-    uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
-    if (sc & 1) {
-      debug("[XHCI] Found device on port {}\n", n);
-      devices[n] = new XhciUsbDevice(this, n);
-    }
+    TryStartPort(n);
   }
+
+  HandleInterrupt();
 }
 
-XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t id)
-       : host(host)
- , slotId(id)
-{
-  uint64_t op_port = host->opregs + 0x400 + slotId*16;
-  uint32_t pmsc = mmio_read<uint32_t>(op_port + P_PMSC);
-  uint32_t li = mmio_read<uint32_t>(op_port + P_LI);
+s2::future<void> XhciDevice::TryStartPort(uint8_t portno) {
+  uint64_t op_port = opregs + 0x400 + portno*16;
+  uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
+  if ((sc & 1) == 0) co_return; 
+  static const char* linkstates[16] = { "U0", "U1", "U2", "U3", "Disabled", "RxDetect", "Inactive", "Polling", "Recovery", "HotReset", "ComplianceMode", "TestMode", "Res12", "Res13", "Res14", "Resume" };
+  static const char* speeds[16] = { "Unk0", "Full", "Low", "High", "Super", "Super2x1", "Super1x2", "Super2x2","Unk","Unk","Unk","Unk","Unk","Unk","Unk","Unk"};
+  uint8_t port_link_state = (sc >> 5) & 0xF;
+  uint8_t port_speed = (sc >> 10) & 0xF;
+  debug("[XHCI] Found {s} device at {s} on port {}\n", linkstates[port_link_state], speeds[port_speed], portno);
+
+  uint64_t curevt = co_await RunCommand(EnableSlot());
+
+  uint8_t slotid = (curevt >> 24) & 0xFF;
+  uint8_t status = (curevt >> 56) & 0xFF;
+  debug("[XHCI] Got event! {x} {}\n", status, slotid);
+  if (status != XHCI_COMPLETION_SUCCESS || slotid == 0)
+    co_return;
+
   mmio_write<uint32_t>(op_port + P_SC, 0x10);
+  // TODO: co_await delay(1us);
   while (mmio_read<uint32_t>(op_port + P_SC) & 0x10) {}
-/*
-  void* last_command = nullptr;
-  last_command = cmdring.enqueue(create_enableslot_command(protocol_speeds[portspeed].slottype));
-  //Now get a command completion event from the event ring
-  uint64_t* curevt = (uint64_t*)waitComplete(last_command, 1000);
-  uint8_t slotid = curevt[1] >> 56;
-  if (get_trb_completion_code(curevt) != XHCI_COMPLETION_SUCCESS || slotid == 0) {
-    debug("Could not get a slot ID from xhci controller, turning off port");
-    state = Off;
-    return;
-  }
+  sc = mmio_read<uint32_t>(op_port + P_SC);
 
-  //kprintf(u"  DSE command complete: %d\n", slotid);
-  xhci_port_info* port_info = new xhci_port_info(this, slotid);
-  port_info->controller = cinfo;
-  port_info->portindex = n;
-  port_info->slotid = slotid;
-  if (!createSlotContext(portspeed, port_info))
-    return;
+  port_link_state = (sc >> 5) & 0xF;
+  port_speed = (sc >> 10) & 0xF;
+  debug("[XHCI] Found {s} device at {s} on port {}\n", linkstates[port_link_state], speeds[port_speed], portno);
 
-  // set address first, then request descriptors
-  enqueue_command(create_setup_stage_trb(0x80, 6, 0x100, 0, 20, 3));
-  enqueue_command(create_data_stage_trb(get_physical_address((void*)descriptors), 20, true));
-  enqueue_command(create_status_stage_trb(true));
-  send_commands();
-  */
-/*
-  void* statusevt = port_info->cmdring.enqueue_commands(devcmds);
-  void* resulttrb = waitComplete(statusevt, 1000);
-*/ // how?
-/*  if (get_trb_completion_code(resulttrb) != XHCI_COMPLETION_SUCCESS)
-  {
-    kprintf(u"Error getting device descriptor (code %d)\n", get_trb_completion_code(resulttrb));
-    return;
-  }
-  kprintf_a("   Device %x:%x class %x:%x:%x USB version %x\n", devdesc->idVendor, devdesc->idProduct, devdesc->bDeviceClass, devdesc->bDeviceSublass, devdesc->bDeviceProtocol, devdesc->bcdUSB);
-*/
-/*
-  if (devdesc->iManufacturer != 0)
-  {
-    //Get device string
-    devcmds[0] = create_setup_stage_trb(0x80, 6, 0x300 + devdesc->iManufacturer, 0, 256, 3);
-    volatile wchar_t* devstr = new wchar_t[256];
-    devcmds[1] = create_data_stage_trb(get_physical_address((void*)devstr), 256, true);
-    devcmds[2] = create_status_stage_trb(true);
-    devcmds[3] = nullptr;
-    statusevt = port_info->cmdring.enqueue_commands(devcmds);
-    resulttrb = waitComplete(statusevt, 1000);
-    kprintf(u"   Device vendor %s\n", ++devstr);
-  }
-  if (devdesc->iProduct != 0)
-  {
-    //Get device string
-    devcmds[0] = create_setup_stage_trb(0x80, 6, 0x300 + devdesc->iProduct, 0, 256, 3);
-    volatile wchar_t* devstr = new wchar_t[256];
-    devcmds[1] = create_data_stage_trb(get_physical_address((void*)devstr), 256, true);
-    devcmds[2] = create_status_stage_trb(true);
-    devcmds[3] = nullptr;
-    statusevt = port_info->cmdring.enqueue_commands(devcmds);
-    resulttrb = waitComplete(statusevt, 1000);
-    kprintf(u"   %s\n", ++devstr);
-  }
-  */
+  if (port_link_state != 0) 
+    co_return;
+
+  devices[slotid] = new XhciUsbDevice(this, slotid);
+  co_return co_await devices[slotid]->start();
 }
+XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t id) 
+: host(host)
+, slotId(id)
+, op_port(host->opregs + 0x400 + id * 16)
+, portmap(freepage_get_zeroed(), 0x1000, DeviceMemory)
+, port((InputContext*)portmap.get())
+{
+  memset(port, 0, sizeof(*port));
+
+  port->d = 0;
+  port->a = 3;
+  uint8_t rootHubPortNo = slotId;
+
+  port->port.route = 0x08010000;
+  port->port.ports = 0x00000000 | (rootHubPortNo << 16);
+  port->port.parent = 0;
+  port->port.device = 0;
+
+  port->port.control.a = 0;
+  port->port.control.b = 0x00400020;
+  port->port.control.tr_deq_ptr = host->ports.to_physical((void*)&port->loop);
+  port->port.control.average = 8;
+}
+
+uintptr_t XhciUsbDevice::EnqueueCommand(xhci_command cmd) {
+  uint8_t index = (port->loopIndex++) % 128;
+  if ((port->loopIndex & 0x80) == 0) cmd.control ^= TRB_FLAG_C;
+  port->loop[index] = cmd;
+  return host->ports.to_physical((void*)&port->loop[index]);
+}
+
+void XhciUsbDevice::RingDoorbell(uint8_t endpoint, bool in) {
+  mmio_write<uint32_t>(host->doorbell + slotId * 4, endpoint * 2 + in);
+}
+
+s2::future<void> XhciUsbDevice::start() {
+  uint64_t addr_evt = co_await host->RunCommand(AddressDevice(portmap.to_physical(port), slotId));
+  debug("Could not retrieve device descriptor\n");
+  if ((addr_evt >> 56) != XHCI_COMPLETION_SUCCESS) co_return;
+  debug("Could not retrieve device descriptor\n");
+
+  debug("tr_deq_ptr {x}\n", port->port.control.tr_deq_ptr);
+
+  debug("Starting device\n");
+  EnqueueCommand(SetupStage(0x80, 6, 0x100, 18, 0, 3));
+  EnqueueCommand(DataStage(host->ports.to_physical((void*)&port->device_descriptor), 18, 1, true));
+  uintptr_t cmdPtr = EnqueueCommand(StatusStage());
+  debug("Commands queued\n");
+
+  s2::future<uint64_t> statusResult = host->RegisterStatus(cmdPtr);
+  RingDoorbell();
+  uint64_t result = co_await statusResult;
+
+  uint8_t status = (result >> 56) & 0xFF;
+  if (status != XHCI_COMPLETION_SUCCESS) {
+    debug("Could not retrieve device descriptor\n");
+    co_return;
+  }
+
+  debug("Found USB device {x}:{x} class {x}:{x}:{x}\n", port->device_descriptor.vendorId, port->device_descriptor.deviceId,port->device_descriptor.deviceClass,port->device_descriptor.subClass,port->device_descriptor.protocol);
+}
+
 

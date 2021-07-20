@@ -40,7 +40,7 @@ public:
   uint16_t widthMm, heightMm, dotsPerInch;
   s2::string connection, manufacturer, serialno, name;
   uint8_t displayBpp;
-  std::vector<Resolution> supportedResolutions;
+  s2::vector<Resolution> supportedResolutions;
   Resolution currentResolution;
 
   // Up to three buffers are supported:
@@ -50,7 +50,7 @@ public:
   // If this function returns false, the modeset did not work.
   virtual bool SetActiveResolution(const Resolution& res, size_t bufferCount) = 0;
   // Queue this buffer for display and return a future that indicates when a new free buffer should be requested for drawing an update. See @SetActiveResolution for rationale.
-  virtual future<void> QueueBuffer(void*) = 0;
+  virtual s2::future<void> QueueBuffer(void*) = 0;
   // Request the address of the currently free buffer.
   virtual void* GetFreeBuffer() = 0;
 };

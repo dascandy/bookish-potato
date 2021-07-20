@@ -189,7 +189,7 @@ void Cipher::Sha256::AddBlock(const uint8_t* data, size_t length) {
 #endif
 }
 
-std::vector<uint8_t> Cipher::Sha256::GetHash() {
-  return std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(state), reinterpret_cast<const uint8_t*>(state + 8));
+s2::vector<uint8_t> Cipher::Sha256::GetHash() {
+  return s2::vector<uint8_t>(reinterpret_cast<const uint8_t*>(state), reinterpret_cast<const uint8_t*>(state + 8));
 }
 

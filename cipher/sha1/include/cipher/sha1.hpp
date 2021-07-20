@@ -11,7 +11,7 @@ class Sha1 {
 public:
   Sha1();
   void AddBlock(const uint8_t* data, size_t length);
-  std::vector<uint8_t> GetHash();
+  s2::vector<uint8_t> GetHash();
 };
 
 }

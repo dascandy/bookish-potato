@@ -250,7 +250,7 @@ public:
     }
     setSize(size() + bytesAdded);
   }
-  std::vector<string> split(uint32_t separator = ' ') const;
+  s2::vector<string> split(uint32_t separator = ' ') const;
 
   void shrink_to_fit() {
     // Policy is to shrink only if you can either save 12% or more, or if you can go back to internal storage.

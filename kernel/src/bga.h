@@ -12,7 +12,7 @@ public:
   struct BgaScreen : public Screen {
     BgaScreen(pcidevice dev, void* edid);
     bool SetActiveResolution(const Resolution& res, size_t bufferCount) override;
-    future<void> QueueBuffer(void*) override;
+    s2::future<void> QueueBuffer(void*) override;
     void* GetFreeBuffer() override;
     uint16_t xres, yres;
     uint8_t displayBufferId, queuedBufferId, bufferCount;

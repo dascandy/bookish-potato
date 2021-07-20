@@ -1,0 +1,116 @@
+#pragma once
+
+#include <cassert>
+
+namespace s2 {
+
+namespace {
+
+template <typename T>
+constexpr T max(T a, T b) { return (a > b) ? a : b; }
+
+template <typename... types>
+struct largest_of;
+template <typename T, typename... types>
+struct largest_of<T, types...> {
+  static constexpr const size_t size = max(sizeof(T), largest_of<types...>::size);
+};
+
+template <typename T>
+struct largest_of<T> {
+  static constexpr const size_t size = sizeof(T);
+};
+
+template <size_t n, typename T, typename... types>
+struct get_index_of_type;
+template <size_t n, typename T, typename U, typename... types>
+struct get_index_of_type<n, T, U, types...> {
+  static constexpr const size_t index = get_index_of_type<n+1, T, types...>::index;
+};
+template <size_t n, typename T, typename... types>
+struct get_index_of_type<n, T, T, types...> {
+  static constexpr const size_t index = n;
+};
+
+template <size_t n, typename... types>
+struct get_type_by_index;
+
+template <size_t n, typename T, typename... types>
+struct get_type_by_index<n, T, types...> {
+  using type = typename get_type_by_index<n-1, types...>::type;
+};
+
+template <typename T, typename... types>
+struct get_type_by_index<0, T, types...> {
+  using type = T;
+};
+
+template <typename T>
+void destruct(T& t) {
+  t.~T();
+}
+
+}
+
+template <typename... types>
+struct variant {
+  template <typename T, typename U, typename... list>
+  auto invoke_on_each_(size_t i, T&& f) {
+    if (i == index_)
+      return f(*reinterpret_cast<U*>(buffer));
+    else if constexpr (sizeof...(list))
+      return invoke_on_each_<T, list...>(i+1, s2::move(f));
+    else 
+      __builtin_unreachable();
+  }
+  template <typename T>
+  auto invoke_on_each(T&& f) {
+    return invoke_on_each_<T, types...>(0, s2::move(f));
+  }
+  variant() 
+  : index_(0)
+  {
+    new (buffer) typename get_type_by_index<0, types...>::type();
+  }
+  template <typename T>
+  variant(T value) 
+  : index_(get_index_of_type<0, T, types...>::index)
+  {
+    new (buffer) T(s2::move(value));
+  }
+  ~variant() {
+    invoke_on_each([](auto& t) { destruct(t); });
+  }
+  size_t index() const {
+    return index_;
+  }
+  size_t index_ = 0;
+  alignas(8) char buffer[largest_of<types...>::size];
+};
+
+template <typename T, typename... types>
+const T& get(const variant<types...>& v) {
+  assert(v.index() == get_index_of_type<0, T, types...>::index);
+  return *reinterpret_cast<const T*>(v.buffer);
+}
+
+template <typename T, typename... types>
+T& get(variant<types...>& v) {
+  assert(v.index() == get_index_of_type<0, T, types...>::index);
+  return *reinterpret_cast<T*>(v.buffer);
+}
+
+template <size_t index, typename... types>
+typename get_type_by_index<index, types...>::type & get(variant<types...>& v) {
+  assert(v.index() == index);
+  return *reinterpret_cast<typename get_type_by_index<index, types...>::type*>(v.buffer);
+}
+
+template <size_t index, typename... types>
+const typename get_type_by_index<index, types...>::type & get(const variant<types...>& v) {
+  assert(v.index() == index);
+  return *reinterpret_cast<const typename get_type_by_index<index, types...>::type*>(v.buffer);
+}
+
+}
+
