@@ -39,6 +39,8 @@ namespace s2 {
       reserve(e-b);
       while (b != e) push_back(*b++);
     }
+    template <typename U>
+    vector(U u) : vector(u.begin(), u.end()) {}
     vector& operator=(const vector& v) {
       while (size() > v.size())
         pop_back();
@@ -121,6 +123,12 @@ namespace s2 {
     }
     const T* end() const {
       return buf + size_;
+    }
+    T* data() {
+      return buf;
+    }
+    const T* data() const {
+      return buf;
     }
     T& operator[](size_t n) {
       return buf[n];

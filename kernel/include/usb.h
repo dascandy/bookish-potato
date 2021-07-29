@@ -2,6 +2,21 @@
 
 #include <cstdint>
 
+enum class DescriptorType {
+  Device = 0x1,
+  Configuration = 0x2,
+  String = 0x3,
+  Interface = 0x4,
+  Endpoint = 0x5,
+  HID = 0x21,
+  Report = 0x22,
+};
+
+struct UsbDescriptor {
+  uint8_t length;
+  uint8_t type;
+};
+
 struct DeviceDescriptor {
   uint8_t length;
   uint8_t type;
@@ -51,4 +66,31 @@ struct EndpointDescriptor {
   uint8_t interval;
 };
 
+struct StringLanguages {
+  uint8_t length;
+  uint8_t type;
+  uint16_t languages[1];
+};
+
+struct HIDDescriptor {
+  struct Entry {
+    uint8_t descriptorType;
+    int16_t descriptorLength;
+  } __attribute__((packed));
+  uint8_t length;
+  uint8_t type;
+  uint16_t hidVersion;
+  uint8_t countryCode;
+  uint8_t numDescriptors;
+  Entry entries[1];
+} __attribute__((packed));
+
+static_assert(sizeof(HIDDescriptor) == 9);
+static_assert(sizeof(HIDDescriptor::Entry) == 3);
+
+struct ReportDescriptor {
+  uint8_t length;
+  uint8_t type;
+  uint8_t data[1];
+};
 

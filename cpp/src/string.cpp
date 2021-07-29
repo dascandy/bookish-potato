@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <cassert>
 
 size_t strlen(const char *str) {
   size_t n = 0;
@@ -115,6 +116,67 @@ string string::from_cp437(span<const uint8_t> data) {
   string s;
   for (auto& v : data) {
     s.push_back(cp437_table[v]);
+  }
+  return s;
+}
+
+static inline uint16_t getValue(const uint8_t*& ptr, bool littleEndian) {
+  uint16_t value;
+  if (littleEndian) {
+    value = (ptr[1] << 8) | ptr[0];
+  } else {
+    value = (ptr[0] << 8) | ptr[1];
+  }
+  ptr += 2;
+  return value;
+}
+
+static uint32_t getUtf16Char(const uint8_t *&ptr, bool littleEndian, bool lastEntry) {
+  uint16_t v1 = getValue(ptr, littleEndian);
+  if (v1 >= 0xD800 && v1 <= 0xDBFF) {
+    if (lastEntry) {
+      return 0xFFFD;
+    }
+    uint32_t val = (v1 << 10) & 0xFFC00;
+    uint16_t v2 = getValue(ptr, littleEndian);
+    if (v2 >= 0xDC00 && v2 <= 0xDFFF) {
+      val |= (v2 & 0x3FF);
+      val += 0x10000;
+      return val;
+    } else {
+      // Missing surrogate; leave second half here
+      ptr -= 2;
+      return 0xFFFD;
+    }
+  } else if (v1 >= 0xDC00 && v1 <= 0xDFFF) {
+    return 0xFFFD;
+  } else {
+    return v1;
+  }
+}
+
+string string::from_utf16(span<const uint8_t> data, bool littleEndian) {
+  assert(data.size() % 2 == 0);
+  string s;
+  const uint8_t* p = data.data(), *e = data.data() + data.size();
+  while (p != e) {
+    s.push_back(getUtf16Char(p, littleEndian, (p == e-2)));
+  }
+  return s;
+}
+
+string string::from_utf32(span<const uint8_t> data, bool littleEndian) {
+  assert(data.size() % 4 == 0);
+
+  string s;
+  for (size_t index = 0; index < data.size(); index += 4) {
+    uint32_t value = littleEndian 
+       ? (data[index]) | (data[index+1] << 8) | (data[index+2] << 16) | (data[index+3] << 24)
+       : (data[index+3]) | (data[index+2] << 8) | (data[index+1] << 16) | (data[index] << 24);
+    if ((value >= 0xD800 && value < 0xE000) || value > 0x10FFFF) 
+      s.push_back(0xFFFD);
+    else
+      s.push_back(value);
   }
   return s;
 }

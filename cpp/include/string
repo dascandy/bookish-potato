@@ -60,11 +60,13 @@ public:
   }
   // Additional constructors, for initializing with UTF16 or UTF32 contents.
   static string from_cp437(span<const uint8_t> data);
-  string(uint16_t *data) : string() {
-    while (*data) {
-      push_back(getUtf16Char(data));
-    }
-  }
+  static string from_utf16(span<const uint8_t> data, bool isLittleEndian);
+  static string from_utf16le(span<const uint8_t> data) { return from_utf16(data, true); }
+  static string from_utf16be(span<const uint8_t> data) { return from_utf16(data, false); }
+  static string from_utf32(span<const uint8_t> data, bool isLittleEndian);
+  static string from_utf32le(span<const uint8_t> data) { return from_utf32(data, true); }
+  static string from_utf32be(span<const uint8_t> data) { return from_utf32(data, false); }
+
   string(uint32_t *data) : string() {
     while (*data) {
       push_back(*data++);
@@ -319,27 +321,6 @@ public:
     else u.s.size_ = newSize;
   }
 private:
-  uint32_t getUtf16Char(uint16_t *&ptr) {
-    if (*ptr >= 0xD800 && *ptr <= 0xDBFF) {
-      uint32_t val = (*ptr << 10) & 0xFFC00;
-      ptr++;
-      if (*ptr >= 0xDC00 && *ptr <= 0xDFFF) {
-        val |= (*ptr & 0x3FF);
-        val += 0x10000;
-        ptr++;
-        return val;
-      } else {
-        return 0xFFFD;
-      }
-    } else if (*ptr >= 0xDC00 && *ptr <= 0xDFFF) {
-      ptr++;
-      return 0xFFFD;
-    } else {
-      uint16_t val = *ptr;
-      ptr++;
-      return val;
-    }
-  }
   union {
     struct {
       size_t isLocal_;

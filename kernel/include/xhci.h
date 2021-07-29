@@ -6,26 +6,8 @@
 #include <vector>
 #include <map.h>
 #include "future.h"
-#include "usb.h"
-
-class UsbHost {
-public:
-  
-};
-
-enum UsbDeviceState {
-  New,
-  Broken,
-  Active,
-  Suspend,
-  Off
-};
-
-struct UsbDevice {
-  UsbDeviceState state = New;
-  char descriptors[256];
-  char buffer[1024];
-};
+#include "UsbCore.h"
+#include <string>
 
 struct InputContext;
 
@@ -35,7 +17,7 @@ struct xhci_command {
 };
 
 class XhciUsbDevice;
-class XhciDevice : public PciDevice, public UsbHost {
+class XhciDevice : public PciDevice {
   struct PendingCallback {
     uint64_t addr;
     s2::promise<uint64_t> p;
@@ -43,12 +25,14 @@ class XhciDevice : public PciDevice, public UsbHost {
 public:
   XhciDevice(pcidevice dev);
 private:
-  s2::future<void> TryStartPort(uint8_t portno);
   uint64_t CreateContext(uint32_t scratchcount);
   s2::future<uint64_t> RunCommand(xhci_command cmd);
   void HandleInterrupt();
   void start();
   s2::future<uint64_t> RegisterStatus(uintptr_t address);
+ 
+  void ReportDevice(XhciUsbDevice& device);
+
   pcidevice dev;
   mapping bar1;
   mapping dcbaa;
@@ -62,18 +46,34 @@ private:
   s2::vector<PendingCallback> callbacks;
 };
 
-class XhciUsbDevice : public UsbDevice {
+class XhciUsbDevice final : public UsbDevice {
 public:
   XhciUsbDevice(XhciDevice* host, uint8_t id);
   s2::future<void> start();
+
+  s2::future<s2::span<const uint8_t>> RunCommandRequest(uint8_t requestType, uint8_t request, uint16_t value, uint16_t index, uint16_t length) override;
+  DeviceDescriptor& GetDeviceDescriptor() override;
+  const s2::vector<ConfigurationDescriptor*>& GetConfigurationDescriptors() override;
+  s2::future<void> SetConfiguration(uint8_t configuration) override;
+
+private:
+  s2::future<bool> StartUp();
   uintptr_t EnqueueCommand(xhci_command cmd);
   void RingDoorbell(uint8_t endpoint = 0, bool in = true);
+  s2::future<s2::string> GetStringDescriptor(uint8_t descriptorId, uint16_t languageId);
+  s2::future<bool> GetDescriptor(DescriptorType type, uint8_t descriptorId, s2::span<uint8_t> descriptor);
+
   mapping portmap;
   XhciDevice* host;
   InputContext* port;
   uint8_t slotId;
   uintptr_t op_port;
+  uint8_t portid;
+  bool active;
   DeviceDescriptor dd;
+  s2::vector<ConfigurationDescriptor*> cd;
+  s2::vector<UsbInterface*> activeInterfaces;
+  s2::string manufacturer, product, serial, config, interface;
 };
 
 

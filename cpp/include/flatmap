@@ -3,20 +3,25 @@
 #include <vector>
 #include <utility>
 
+namespace s2 {
+
 template <typename K, typename V>
-class flatmap : private s2::vector<std::pair<const K, V>> {
+class flatmap : private vector<pair<const K, V>> {
 public:
-  typedef typename s2::vector<std::pair<const K, V>>::iterator iterator;
-  typedef typename s2::vector<std::pair<const K, V>>::const_iterator const_iterator;
-  using s2::vector<std::pair<const K, V>>::begin;
-  using s2::vector<std::pair<const K, V>>::end;
-  using s2::vector<std::pair<const K, V>>::size;
+  typedef typename vector<pair<const K, V>>::iterator iterator;
+  typedef typename vector<pair<const K, V>>::const_iterator const_iterator;
+  using vector<pair<const K, V>>::begin;
+  using vector<pair<const K, V>>::end;
+  using vector<pair<const K, V>>::size;
   V &operator[](const K &key) {
-    for (std::pair<const K, V> &p : *this) {
+    for (pair<const K, V> &p : *this) {
       if (p.first == key) return p.second;
     }
-    this->push_back(std::pair<const K, V>(key, V()));
+    this->push_back(pair<const K, V>(key, V()));
     return this->back().second;
+  }
+  void emplace(K k, V v) {
+    (*this)[move(k)] = move(v);
   }
   template <typename P>
   void insert(const P & p) {
@@ -39,5 +44,7 @@ public:
     return it;
   }
 };
+
+}
 
 
