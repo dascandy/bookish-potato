@@ -499,7 +499,7 @@ s2::future<s2::string> XhciUsbDevice::GetStringDescriptor(uint8_t descriptorId, 
     // Log error
     co_return "";
   }
-  co_return s2::string::from_utf16le(str);
+  co_return s2::string::from_utf16le(str.subspan(2));
 }
 
 s2::future<bool> XhciUsbDevice::StartUp() {
@@ -517,7 +517,7 @@ s2::future<bool> XhciUsbDevice::StartUp() {
     debug("[XHCI] Could not retrieve device descriptor\n");
     co_return false;
   }
-  debug("Found USB device {x}:{x} class {x}:{x}:{x}\n", port->device_descriptor.vendorId, port->device_descriptor.deviceId,port->device_descriptor.deviceClass,port->device_descriptor.subClass,port->device_descriptor.protocol);
+  debug("[XHCI] Found USB device {x}:{x} class {x}:{x}:{x}\n", port->device_descriptor.vendorId, port->device_descriptor.deviceId,port->device_descriptor.deviceClass,port->device_descriptor.subClass,port->device_descriptor.protocol);
 
   uint8_t length;
   if (!co_await GetDescriptor(DescriptorType::String, 0, s2::span<uint8_t>(&length, 1))) {
@@ -618,9 +618,8 @@ s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
     uint8_t* start = configDesc + offset;
     UsbDescriptor* desc = (UsbDescriptor*)(configDesc + offset);
     do {
-      debug("{} {}\n", desc->length, desc->type);
       if (desc->length < 2) {
-        debug("Found invalid descriptor\n");
+        debug("[XHCI] Found invalid descriptor\n");
         co_return;
       }
       descriptors.push_back(desc);

@@ -4,6 +4,10 @@
 
 static char hextab[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
+void debug_field(bool value, s2::string_view spec) {
+  debug_field(value ? "true" : "false", "s");
+}
+
 void debug_field(uint64_t value, s2::string_view spec) {
   size_t pad = 0;
   int base = 10;

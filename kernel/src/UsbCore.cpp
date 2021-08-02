@@ -42,11 +42,8 @@ void UsbCore::RegisterUsbInterface(UsbInterface& dev) {
   }
 }
 
-s2::future<s2::span<const uint8_t>> UsbInterface::GetDescriptor(DescriptorType descriptorType, uint8_t descriptorId) {
-  auto start = co_await dev.RunCommandRequest(0x81, 6, ((uint16_t)descriptorType << 8) | descriptorId, interfaceNum, sizeof(UsbDescriptor));
-  if (start.empty()) co_return {};
-  UsbDescriptor* desc = (UsbDescriptor*)start.data();
-  co_return co_await dev.RunCommandRequest(0x81, 6, ((uint16_t)descriptorType << 8) | descriptorId, interfaceNum, desc->length);
+s2::future<s2::span<const uint8_t>> UsbInterface::GetDescriptor(DescriptorType descriptorType, uint8_t descriptorId, size_t length) {
+  co_return co_await dev.RunCommandRequest(0x81, 6, ((uint16_t)descriptorType << 8) | descriptorId, interfaceNum, length);
 }
 
 s2::vector<const UsbDescriptor*>& UsbInterface::GetInterfaceDescriptors() {

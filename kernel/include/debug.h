@@ -14,6 +14,7 @@ void debug_char(char c);
 void debug_field(void* value, s2::string_view spec);
 
 void debug_field(uint64_t value, s2::string_view spec);
+void debug_field(bool value, s2::string_view spec);
 inline void debug_field(uint32_t value, s2::string_view spec) { debug_field((uint64_t)value, spec); }
 inline void debug_field(uint16_t value, s2::string_view spec) { debug_field((uint64_t)value, spec); }
 inline void debug_field(uint8_t value, s2::string_view spec) { debug_field((uint64_t)value, spec); }

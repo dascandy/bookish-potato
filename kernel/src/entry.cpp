@@ -12,6 +12,7 @@
 #include "event.h"
 #include "timer.h"
 #include "io.h"
+#include "UsbDrivers.h"
 
 #ifdef __x86_64__
 struct mb1 {
@@ -94,6 +95,8 @@ void platform_init(void* platform_data, uint32_t magic) {
     debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
   }
   acpi_init();
+//  init_pci_drivers();
+  init_usb_drivers();
   pci_handle_bridge(0, 0);
 }
 #else
@@ -135,6 +138,8 @@ void platform_init(void* platform_data, uint32_t magic) {
 
   RpiFramebuffer* fb = RpiFramebuffer::Create();
   debug("[PLAT] Found monitor {s} {s} serial# {s} at resolution {}x{}\n", fb->m.brand, fb->m.name, fb->m.serial, fb->m.width, fb->m.height);
+
+  init_usb_drivers();
 //  sd_init(model.mmio_base + 0x00300000);
 }
 

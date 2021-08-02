@@ -15,11 +15,11 @@ struct UsbDevice {
 
 struct UsbInterface {
   UsbInterface(UsbDevice& dev, uint8_t id, s2::vector<const UsbDescriptor*> interfaceDescriptor);
-  s2::span<const uint8_t> descriptors;
-  s2::future<s2::span<const uint8_t>> GetDescriptor(DescriptorType descriptorType, uint8_t descriptorId);
+  s2::future<s2::span<const uint8_t>> GetDescriptor(DescriptorType descriptorType, uint8_t descriptorId, size_t length);
+  s2::vector<const UsbDescriptor*>& GetInterfaceDescriptors();
+private:
   UsbDevice& dev;
   s2::vector<const UsbDescriptor*> interfaceDescriptors;
-  s2::vector<const UsbDescriptor*>& GetInterfaceDescriptors();
   uint8_t interfaceNum;
 };
 
