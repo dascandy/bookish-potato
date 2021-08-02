@@ -12,7 +12,7 @@
 #include "event.h"
 #include "timer.h"
 #include "io.h"
-#include "UsbDrivers.h"
+#include "usb/UsbDrivers.h"
 
 #ifdef __x86_64__
 struct mb1 {

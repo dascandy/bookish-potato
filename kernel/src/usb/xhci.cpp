@@ -1,4 +1,4 @@
-#include "xhci.h"
+#include "usb/xhci.h"
 #include "pci.h"
 #include "debug.h"
 #include "io.h"
@@ -6,8 +6,8 @@
 #include <cstring>
 #include "freepage.h"
 #include "future.h"
-#include "usb.h"
-#include "UsbCore.h"
+#include "usb/UsbSpec.h"
+#include "usb/UsbCore.h"
 
 constexpr uint64_t CR_CAPLENGTH = 0;
 constexpr uint64_t CR_HCIVERSION = 2;

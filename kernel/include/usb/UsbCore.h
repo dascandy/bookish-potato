@@ -1,6 +1,6 @@
 #pragma once
 
-#include "usb.h"
+#include "usb/UsbSpec.h"
 #include <string>
 #include <future.h>
 #include <flatmap>

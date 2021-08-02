@@ -1,7 +1,7 @@
 #include "pci.h"
 #include "io.h"
 #include "nvme.h"
-#include "xhci.h"
+#include "usb/xhci.h"
 #include "debug.h"
 #include "bga.h"
 #include "virtiogpu.h"

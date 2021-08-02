@@ -6,7 +6,7 @@
 #include <vector>
 #include <map.h>
 #include "future.h"
-#include "UsbCore.h"
+#include "usb/UsbCore.h"
 #include <string>
 
 struct InputContext;

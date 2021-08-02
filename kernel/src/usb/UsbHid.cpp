@@ -1,4 +1,4 @@
-#include "UsbHid.h"
+#include "usb/UsbHid.h"
 #include "debug.h"
 
 enum ReportEntry {

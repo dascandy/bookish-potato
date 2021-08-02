@@ -1,4 +1,4 @@
-#include "UsbCore.h"
+#include "usb/UsbCore.h"
 #include "debug.h"
 
 UsbCore& UsbCore::Instance() {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UsbCore.h"
+#include "usb/UsbCore.h"
 
 struct HidField {
   uint32_t usage;
