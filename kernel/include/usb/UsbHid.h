@@ -13,6 +13,7 @@ struct UsbHidDevice {
   UsbHidDevice(UsbInterface& in);
   s2::future<void> start();
   void ParseReport(s2::span<const uint8_t> data);
+  void HandleReport(s2::span<const uint8_t> report);
   
   UsbInterface& in;
   s2::vector<HidField> input, output;

@@ -101,7 +101,8 @@ xhci_speed vtbl[16] = {
 };
 
 struct EndpointContext {
-  uint32_t a, b;
+  uint32_t a;
+  uint32_t b;
   uint64_t tr_deq_ptr;
   uint32_t average;
   uint32_t res[3];
@@ -339,7 +340,9 @@ XhciDevice::XhciDevice(pcidevice dev)
     }
   }
 
-  HandleInterrupt();
+  for (size_t n = 0; n < 3; n++) {
+    HandleInterrupt();
+  }
 }
 
 s2::future<uint64_t> XhciDevice::RegisterStatus(uintptr_t address) {
@@ -371,6 +374,7 @@ s2::future<uint64_t> XhciDevice::RunCommand(xhci_command cmd) {
 }
 
 void XhciDevice::HandleInterrupt() {
+  debug("[XHCI] Interrupt\n");
   xhci_command* cmd = (xhci_command*)eventRing.get();
   while (true) {
     xhci_command& current = cmd[eventRingIndex];
@@ -416,17 +420,6 @@ void XhciDevice::HandleInterrupt() {
         break;
     }
     eventRingIndex++;
-  }
-}
-
-void XhciDevice::ReportDevice(XhciUsbDevice& device) {
-  auto& cds = device.GetConfigurationDescriptors();
-  assert(not cds.empty());
-  if (cds.size() == 1) {
-    device.SetConfiguration(0);
-  } else {
-    // TODO: do something smart with things with more than one configuration
-    device.SetConfiguration(0);
   }
 }
 
@@ -578,7 +571,7 @@ s2::future<void> XhciUsbDevice::start() {
   host->devices[slotId] = this;
 
   if (co_await StartUp()) {
-    host->ReportDevice(*this);
+    UsbCore::Instance().RegisterUsbDevice(*this);
   } else {
     // Log error
     mmio_write<uint64_t>((uintptr_t)host->dcbaa.get() + 8 + 8*slotId, 0);
@@ -597,8 +590,90 @@ const s2::vector<ConfigurationDescriptor*>& XhciUsbDevice::GetConfigurationDescr
   return cd;
 }
 
+struct XhciEndpoint final : public UsbEndpoint {
+  XhciEndpoint(XhciUsbDevice& dev, uint8_t endpointId, bool isIn) 
+  : dev(dev)
+  , address(freepage_get_zeroed())
+  , map(address, 0x1000, DeviceMemory)
+  , loop((xhci_command*)map.get())
+  , endpointId(endpointId)
+  , isIn(isIn)
+  {
+  }
+  s2::future<void> ReadData(uint64_t physAddr, size_t length) override;
+  XhciUsbDevice& dev;
+  uint64_t address;
+  mapping map;
+  xhci_command* loop;
+  uint8_t loopIndex = 0;
+  uint8_t endpointId;
+  bool isIn;
+};
+
+s2::future<void> XhciEndpoint::ReadData(uint64_t physAddr, size_t length) {
+  auto& cmd = loop[loopIndex++];
+  cmd = NormalTRB(physAddr, length, 0);
+  cmd.control |= TRB_FLAG_IOC | TRB_FLAG_C;
+
+  s2::future<uint64_t> statusF = dev.host->RegisterStatus(map.to_physical(&cmd));
+  dev.RingDoorbell(endpointId, isIn);
+  uint64_t status = co_await statusF;
+  debug("B\n");
+  if ((status >> 56) != XHCI_COMPLETION_SUCCESS) {
+    debug("[XHCI] Read data request failed\n");
+  }
+} 
+
+s2::future<UsbEndpoint*> XhciUsbDevice::StartupEndpoint(EndpointDescriptor& desc) {
+  uint8_t epId = (desc.address & 0xF);
+  bool isIn = (desc.address & 0x80);
+  XhciEndpoint* ep = new XhciEndpoint(*this, epId, isIn);
+  EndpointContext& epc = (isIn ? port->port.eps[epId - 1].in : port->port.eps[epId - 1].out);
+  uint8_t epType = desc.attributes & 0x03; // control / iso / bulk / interrupt
+  switch(epType) {
+    case 0x01: // iso
+    case 0x03: // interrupt
+      epc.a = (desc.interval << 16) * 8;
+      epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
+      epc.tr_deq_ptr = ep->address | 1;
+      epc.average = desc.maxPacketSize;// | (desc.maxPacketSize << 16);
+      break;
+    case 0x02:
+      // TODO: Bulk
+      break;
+  }
+/*
+EP Type = Isoch IN, Isoch OUT, Interrupt IN or Interrupt OUT. Refer to Table 6-9 for
+the encoding.
+• Max Packet Size = Endpoint Descriptor:wMaxPacketSize & 07FFh.
+• Max Burst Size = SuperSpeed Endpoint Companion Descriptor:bMaxBurst or
+(Endpoint Descriptor: wMaxPacketSize & 1800h) >> 11.
+• Mult = SuperSpeed Endpoint Companion Descriptor:bmAttributes:Mult field.
+Always ‘0’ for Interrupt endpoints.
+• CErr = 3 for Interrupt endpoints. Enables 3 retries.
+CErr = 0 for Isoch endpoints. Retries are not performed for Isoch endpoints.
+• TR Dequeue Pointer = Start address of the first segment of the previously allocated
+Transfer Ring.
+• Dequeue Cycle State (DCS) = 1. Assuming that all TRBs in the segment referenced
+by the TR Dequeue Pointer have been initialized to ‘0’, this field reflects Cycle bit
+state for valid TRBs written by software.
+• Max ESIT Payload = Refer to section 4.14.2 for value.
+*/
+
+  debug("{08x} {08x} {016x} {08x}\n", epc.a, epc.b, epc.tr_deq_ptr, epc.average);
+  port->a = (1 << (epId * 2 + isIn)) | 1;
+  port->port.route = (epId + 1) << 27;
+
+  uint64_t addr_evt = co_await host->RunCommand(ConfigureEndpoint(portmap.to_physical(&port->d), slotId));
+  if ((addr_evt >> 56) != XHCI_COMPLETION_SUCCESS) {
+    debug("[XHCI] Could not address device\n");
+    co_return nullptr;
+  }
+
+  co_return ep;
+}
+
 s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
-  assert(configuration < cd.size());
   if (configuration >= cd.size()) co_return;
   if (not activeInterfaces.empty()) {
     for (auto i : activeInterfaces) {
@@ -607,7 +682,7 @@ s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
     activeInterfaces.clear();
   }
   
-  co_await RunCommandRequest(0, 9, configuration, 0, 0);
+  co_await RunCommandRequest(0, 9, cd[configuration]->configVal, 0, 0);
 
   uint8_t* configDesc = (uint8_t*)(cd[configuration]);
   size_t size = cd[configuration]->totalLength;

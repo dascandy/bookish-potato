@@ -17,7 +17,7 @@ struct xhci_command {
 };
 
 class XhciUsbDevice;
-class XhciDevice : public PciDevice {
+class XhciDevice final : public PciDevice {
   struct PendingCallback {
     uint64_t addr;
     s2::promise<uint64_t> p;
@@ -42,6 +42,7 @@ private:
   uintptr_t cr, opregs, rr, doorbell, commandRingPhysical, eventRingPhysical;
   uint16_t currentCommand = 0, currentFlag = 0, commandRingSize = 0x100, eventRingIndex = 0, currentEventFlag;
   friend class XhciUsbDevice;
+  friend class XhciEndpoint;
   s2::vector<XhciUsbDevice*> devices;
   s2::vector<PendingCallback> callbacks;
 };
@@ -55,6 +56,7 @@ public:
   DeviceDescriptor& GetDeviceDescriptor() override;
   const s2::vector<ConfigurationDescriptor*>& GetConfigurationDescriptors() override;
   s2::future<void> SetConfiguration(uint8_t configuration) override;
+  s2::future<UsbEndpoint*> StartupEndpoint(EndpointDescriptor& desc) override;
 
 private:
   s2::future<bool> StartUp();
@@ -74,6 +76,7 @@ private:
   s2::vector<ConfigurationDescriptor*> cd;
   s2::vector<UsbInterface*> activeInterfaces;
   s2::string manufacturer, product, serial, config, interface;
+  friend class XhciEndpoint;
 };
 
 

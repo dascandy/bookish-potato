@@ -1,5 +1,7 @@
 #include "usb/UsbHid.h"
 #include "debug.h"
+#include "map.h"
+#include "freepage.h"
 
 enum ReportEntry {
   Input = 0x80,
@@ -175,15 +177,29 @@ void UsbHidDevice::ParseReport(s2::span<const uint8_t> data) {
 
 s2::future<void> UsbHidDevice::start() {
   HIDDescriptor* desc = nullptr;
+  EndpointDescriptor* in_ep = nullptr, *out_ep = nullptr;
   for (auto usbd : in.GetInterfaceDescriptors()) {
     if (usbd->type == (int)DescriptorType::HID) {
       desc = (HIDDescriptor*)usbd;
-      break;
+    } else if (usbd->type == (int)DescriptorType::Endpoint) {
+      EndpointDescriptor* ep = (EndpointDescriptor*)usbd;
+      if (in_ep == nullptr && (ep->address & 0x80) == 0x80) {
+        in_ep = ep;
+      } else if (out_ep == nullptr && (ep->address & 0x80) == 0) {
+        out_ep = ep; 
+      } else {
+        debug("[USBHID] Found an endpoint I can't use? Ignoring.\n");
+      }
     }
   }
   uint8_t* reportDesc = nullptr;
   size_t len = 0;
   assert(desc != nullptr);
+  assert(in_ep != nullptr);
+  debug("EP {} {} {} {}\n", in_ep->address, in_ep->attributes, in_ep->maxPacketSize, in_ep->interval);
+  if (out_ep != nullptr) { // it's optional
+    debug("OUT EP {} {} {} {}\n", out_ep->address, out_ep->attributes, out_ep->maxPacketSize, out_ep->interval);
+  }
   for (size_t n = 0; n < desc->numDescriptors; n++) {
     if (desc->entries[n].descriptorType == (int)DescriptorType::Report) {
       len = desc->entries[n].descriptorLength;
@@ -196,6 +212,22 @@ s2::future<void> UsbHidDevice::start() {
   assert(reportDesc != nullptr);
 
   ParseReport(s2::span<const uint8_t>(reportDesc, reportDesc + len));
+
+  auto in_endpoint = co_await in.StartupEndpoint(*in_ep);
+
+  uint64_t page = freepage_get_zeroed();
+  mapping map(page, 0x1000, DeviceMemory);
+  while (true) {
+    co_await in_endpoint->ReadData(page, in_ep->maxPacketSize);
+    HandleReport(s2::span<const uint8_t>((uint8_t*)map.get(), in_ep->maxPacketSize));
+  }
+}
+
+void UsbHidDevice::HandleReport(s2::span<const uint8_t> report) {
+  for (auto& c : report) {
+    debug("{2x} ", c);
+  }
+  debug("\n");
 }
 
 void UsbHid::AddDevice(UsbDevice& dev) {}
