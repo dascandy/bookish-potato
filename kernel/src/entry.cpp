@@ -5,6 +5,7 @@
 #include "interrupt.h"
 #include "debug.h"
 #include "x86/acpi.h"
+#include "x86/apic.h"
 #include "pci.h"
 #include "future.h"
 #include "freepage.h"
@@ -15,6 +16,7 @@
 #include "usb/UsbDrivers.h"
 
 #ifdef __x86_64__
+#include "x86/cpu.h"
 struct mb1 {
   uint32_t flags;
   uint32_t memlower;
@@ -86,6 +88,8 @@ void mb2_init(mb2* data) {
 }
 
 void platform_init(void* platform_data, uint32_t magic) {
+  cpu_init();
+  Apic::init();
   interrupt_init();
   if (magic == 0x2badb002) {
     mb1_init((mb1*)platform_data);

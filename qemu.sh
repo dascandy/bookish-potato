@@ -1,9 +1,11 @@
 #!/bin/bash
 
+#    -smp 1,cores=4,threads=2,sockets=1,maxcpus=8 \
 # This is stupid. But true.
 objcopy -I elf64-x86-64 -O elf32-i386 build/amd64/bin/kernel build/amd64/bin/kernel.i386
-qemu-system-x86_64 -machine q35 --cpu Skylake-Client \
-    -smp 1,cores=4,threads=2,sockets=1,maxcpus=8 \
+#qemu-system-x86_64 -machine q35 --cpu Skylake-Client -enable-kvm \
+qemu-system-x86_64 -machine q35 --cpu host,+x2apic -enable-kvm \
+    -smp cores=8,sockets=1 \
     -vga none \
     -m 4G \
     -device bochs-display,bus=pcie.0 \

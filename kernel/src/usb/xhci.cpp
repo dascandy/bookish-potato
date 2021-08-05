@@ -393,10 +393,10 @@ void XhciDevice::HandleInterrupt() {
         break;
       case 32: // transfer
       case 33: // command completion
-//        debug("[XHCI] Command completion event\n");
+        debug("[XHCI] Command completion event\n");
         for (size_t n = 0; n < callbacks.size(); n++) {
           if (current.pointer == callbacks[n].addr) {
-//            debug("[XHCI] Found handler, informing\n");
+            debug("[XHCI] Found handler, informing\n");
             callbacks[n].p.set_value(((uint64_t)current.status << 32) | current.control);
             callbacks[n] = s2::move(callbacks.back());
             callbacks.pop_back();
@@ -405,14 +405,14 @@ void XhciDevice::HandleInterrupt() {
         }
         break;
       case 34: // port status change
-//        debug("[XHCI] Port status change event\n");
+        debug("[XHCI] Port status change event\n");
         {
           uint8_t port = ((current.pointer >> 24) & 0xFF) - 1;
           uint64_t op_port = opregs + 0x400 + port*16;
           uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
           uint8_t port_speed = (sc >> 10) & 0xF;
           static const char* speeds[16] = { "Unk0", "Full", "Low", "High", "Super", "Super2x1", "Super1x2", "Super2x2","Unk","Unk","Unk","Unk","Unk","Unk","Unk","Unk"};
-//          debug("[XHCI] Found device at {s} on port {}\n", speeds[port_speed], port);
+          debug("[XHCI] Found device at {s} on port {}\n", speeds[port_speed], port);
           if (port_speed != 0) {
             (new XhciUsbDevice(this, port))->start();
           }
@@ -467,12 +467,15 @@ s2::future<s2::span<const uint8_t>> XhciUsbDevice::RunCommandRequest(uint8_t req
   s2::future<uint64_t> statusResult = host->RegisterStatus(EnqueueCommand(StatusStage()));
   RingDoorbell();
 
-  if ((((co_await statusResult) >> 56) & 0xFF) != XHCI_COMPLETION_SUCCESS) co_return {};
+  if ((((co_await statusResult) >> 56) & 0xFF) != XHCI_COMPLETION_SUCCESS) {
+    co_return {};
+  }
   co_return s2::span<const uint8_t>(port->buffer, length);
 }
 
 s2::future<bool> XhciUsbDevice::GetDescriptor(DescriptorType type, uint8_t descriptorId, s2::span<uint8_t> descriptor) {
-  auto data = co_await RunCommandRequest(0x80, 6, ((uint16_t)type << 8) | descriptorId, 0, descriptor.size());
+  auto f = RunCommandRequest(0x80, 6, ((uint16_t)type << 8) | descriptorId, 0, descriptor.size());
+  auto data = co_await f;
   memcpy(descriptor.data(), data.data(), data.size());
   co_return not data.empty();
 }
@@ -578,7 +581,6 @@ s2::future<void> XhciUsbDevice::start() {
     host->devices[slotId] = nullptr;
     host->RunCommand(DisableSlot(slotId));
     delete this;
-    co_return;
   }
 }
 
@@ -633,7 +635,7 @@ s2::future<UsbEndpoint*> XhciUsbDevice::StartupEndpoint(EndpointDescriptor& desc
   switch(epType) {
     case 0x01: // iso
     case 0x03: // interrupt
-      epc.a = (desc.interval << 16) * 8;
+      epc.a = (desc.interval << 16);
       epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
       epc.tr_deq_ptr = ep->address | 1;
       epc.average = desc.maxPacketSize;// | (desc.maxPacketSize << 16);

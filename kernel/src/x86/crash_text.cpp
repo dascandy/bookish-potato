@@ -67,7 +67,7 @@ struct registers {
 [[noreturn]] void unhandled_interrupt_(const registers* regs) {
   clearscreen();
   debug("\x1b[31mUnhandled exception/interrupt\x1b[0m\n");
-  debug("rip={16x} rfl={16x} errc={x}\n", regs->rip, regs->rflags, regs->errorcode);
+  debug("rip={16x} rfl={16x} errc={x}\n\n", regs->rip, regs->rflags, regs->errorcode);
   debug("rax={16x} rbx={16x}\n", regs->rax, regs->rbx);
   debug("rcx={16x} rdx={16x}\n", regs->rcx, regs->rdx);
   debug("rsi={16x} rdi={16x}\n", regs->rsi, regs->rdi);
@@ -75,7 +75,7 @@ struct registers {
   debug(" r8={16x}  r9={16x}\n", regs->r8, regs->r9);
   debug("r10={16x} r11={16x}\n", regs->r10, regs->r11);
   debug("r12={16x} r13={16x}\n", regs->r12, regs->r13);
-  debug("r14={16x} r15={16x}\n", regs->r14, regs->r15);
+  debug("r14={16x} r15={16x}\n\n", regs->r14, regs->r15);
   debug("cr0={16x} cr2={16x}\n", regs->cr0, regs->cr2);
   debug("cr3={16x} cr4={16x}\n", regs->cr3, regs->cr4);
 

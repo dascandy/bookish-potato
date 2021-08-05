@@ -55,7 +55,7 @@ lm_entry:
     movw %ax, %es
     movw %ax, %ds
     movw %ax, %ss
-    movq $0xa0000, %rsp
+    movq $0x9fff8, %rsp
     movq %rbx, %rdi
     movq %rbp, %rsi
     jmp     kernel_entry
