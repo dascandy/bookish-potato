@@ -5,12 +5,13 @@
 #include "debug.h"
 
 // TODO: be able to read edid before creating screen
-VirtioGpu::VirtioGpu(pcidevice dev) 
-: screen(dev, {})
+VirtioGpu::VirtioGpu(uintptr_t confSpaceAddr)
+: PciDevice(confSpaceAddr)
+, screen({})
 {
 }
 
-VirtioGpu::VirtioGpuScreen::VirtioGpuScreen(pcidevice dev, s2::span<const uint8_t> edid) 
+VirtioGpu::VirtioGpuScreen::VirtioGpuScreen(s2::span<const uint8_t> edid) 
 : Screen(edid)
 {
   debug("Found VirtIO graphics adapter\n");

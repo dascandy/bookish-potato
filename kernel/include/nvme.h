@@ -4,6 +4,6 @@
 
 class NvmeDevice : public PciDevice {
 public:
-  NvmeDevice(pcidevice dev);
+  NvmeDevice(uintptr_t confSpaceAddr);
 };
 

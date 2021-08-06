@@ -1,7 +1,8 @@
 #include "nvme.h"
 
-NvmeDevice::NvmeDevice(pcidevice dev) {
-  
+NvmeDevice::NvmeDevice(uintptr_t confSpaceAddr)
+: PciDevice(confSpaceAddr)
+{
 }
 
 

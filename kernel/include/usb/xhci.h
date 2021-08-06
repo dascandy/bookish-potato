@@ -23,7 +23,7 @@ class XhciDevice final : public PciDevice {
     s2::promise<uint64_t> p;
   };
 public:
-  XhciDevice(pcidevice dev);
+  XhciDevice(uintptr_t confSpacePtr);
 private:
   uint64_t CreateContext(uint32_t scratchcount);
   s2::future<uint64_t> RunCommand(xhci_command cmd);
@@ -33,7 +33,6 @@ private:
  
   void ReportDevice(XhciUsbDevice& device);
 
-  pcidevice dev;
   mapping bar1;
   mapping dcbaa;
   mapping commandRing;

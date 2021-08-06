@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <cstddef>
-#include "pci.h"
 
 enum MappingUse {
   DeviceRegisters,
@@ -22,13 +21,15 @@ enum class PciBars {
   Bar5,
 };
 
+struct PciCfgSpace;
+
 void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use);
 uint64_t platform_unmap(void* addr);
 
 struct mapping {
   mapping(uintptr_t address, size_t bytes, MappingUse use);
   mapping();
-  mapping(pcidevice dev, PciBars barno, MappingUse use = MappingUse::DeviceRegisters);
+  mapping(volatile PciCfgSpace* conf, PciBars barno, MappingUse use = MappingUse::DeviceRegisters);
   mapping& operator=(mapping&&);
   mapping(mapping&&);
   uint64_t to_physical(void* p);

@@ -98,10 +98,10 @@ void platform_init(void* platform_data, uint32_t magic) {
   } else {
     debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
   }
-  acpi_init();
 //  init_pci_drivers();
   init_usb_drivers();
-  pci_handle_bridge(0, 0);
+  acpi_init();
+//  pci_handle_bridge(0, 0);
 }
 #else
 #include "rpi/property_print.h"
@@ -157,6 +157,7 @@ extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   asa_init();
   platform_init(platform_data, magic);
   set_utc_offset(1591473338000000 - get_timer_value());
+  debug("[ENTRY] End of platform init\n");
 /*
   while (1) {
     interrupt_check();

@@ -7,10 +7,10 @@
 
 #ifdef __x86_64__
 
-class BgaFramebuffer {
+class BgaFramebuffer final : public PciDevice {
 public:
   struct BgaScreen : public Screen {
-    BgaScreen(pcidevice dev, void* edid);
+    BgaScreen(volatile PciCfgSpace* conf, void* edid);
     bool SetActiveResolution(const Resolution& res, size_t bufferCount) override;
     s2::future<void> QueueBuffer(void*) override;
     void* GetFreeBuffer() override;
@@ -20,7 +20,7 @@ public:
     void* activeScreen;
     uintptr_t bochsregs, qemuregs;
   };
-  BgaFramebuffer(pcidevice dev);
+  BgaFramebuffer(uintptr_t confSpacePtr);
   size_t getScreenCount() { return 1; }
   Screen* getScreen(size_t n) { return &screen; }
 private:

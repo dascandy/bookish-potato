@@ -58,12 +58,12 @@ namespace Apic
   }
 
   void init() {
-/*
     assert(isX2());
+
     wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | 0xC00);
 
-    write(Spurious, read(Spurious) | 0x100);
-    */
+    write(Spurious, 0x130);
+
     /*
     platform_map((void*)ioapic, 0xFEC00000, DeviceRegisters);
 
@@ -92,6 +92,10 @@ namespace Apic
   uint64_t read_ICR()
   {
     return read(ICR);
+  }
+
+  void start_secondary_cpus() {
+    
   }
 }
 

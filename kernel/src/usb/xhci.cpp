@@ -252,9 +252,9 @@ static xhci_command StatusStage() {
 
 }
 
-XhciDevice::XhciDevice(pcidevice dev)
-: dev(dev)
-, bar1(dev, PciBars::Bar0)
+XhciDevice::XhciDevice(uintptr_t confSpacePtr)
+: PciDevice(confSpacePtr)
+, bar1(conf, PciBars::Bar0)
 {
   currentFlag = TRB_FLAG_C;
   currentEventFlag = TRB_FLAG_C;
@@ -272,7 +272,7 @@ XhciDevice::XhciDevice(pcidevice dev)
   debug("[XHCI] Initializing device version {x} (maxports {} maxslots {} maxinterrupters {})\n", hciversion, maxports, maxslots, maxinterrupters);
 
 // Reset device, wait for it to come back up
-  pciwrite16(dev, 0x04, pciread16(dev, 0x04) | 6);
+  conf->status_cmd = (conf->status_cmd | 6);
 
   mmio_write<uint32_t>(opregs + RT_USBCMD, mmio_read<uint32_t>(opregs + RT_USBCMD) & ~RT_USBCMD_RUN);
   while ((mmio_read<uint32_t>(opregs + RT_USBSTS) & RT_USBSTS_HCH) == 0) {}

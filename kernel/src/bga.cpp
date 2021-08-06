@@ -18,9 +18,10 @@ enum BgaReg {
   YOffset
 };
 
-BgaFramebuffer::BgaFramebuffer(pcidevice dev) 
-: regs(dev, PciBars::Bar2)
-, screen(dev, regs.get())
+BgaFramebuffer::BgaFramebuffer(uintptr_t confSpaceAddr) 
+: PciDevice(confSpaceAddr)
+, regs(conf, PciBars::Bar2)
+, screen(conf, regs.get())
 {
   uintptr_t p = (uintptr_t)regs.get();
 }
@@ -28,9 +29,9 @@ BgaFramebuffer::BgaFramebuffer(pcidevice dev)
 //    uint32_t *buffer;
 //    size_t xres, yres, displayBufferId;
 
-BgaFramebuffer::BgaScreen::BgaScreen(pcidevice dev, void* edid) 
+BgaFramebuffer::BgaScreen::BgaScreen(volatile PciCfgSpace* conf, void* edid) 
 : Screen(s2::span<const uint8_t>((const uint8_t*)edid, 256))
-, map(dev, PciBars::Bar0, DeviceMemory)
+, map(conf, PciBars::Bar0, DeviceMemory)
 , bochsregs((uintptr_t)edid + 0x500)
 , qemuregs((uintptr_t)edid + 0x400)
 {

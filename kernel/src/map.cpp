@@ -168,26 +168,26 @@ mapping::mapping(uintptr_t address, size_t bytes, MappingUse use)
   }
 }
 
-mapping::mapping(pcidevice dev, PciBars barno, MappingUse use) 
+mapping::mapping(volatile PciCfgSpace* conf, PciBars barno, MappingUse use) 
 {
-  address = pciread32(dev, (int)barno * 4 + 0x10);
+  address = conf->bar[(int)barno];
   switch (address & 0x7) {
     case 0x0:
       // 32-bit
     case 0x2:
       // 20-bit
-      pciwrite32(dev, 0x10 + (int)barno * 4, 0xFFFFFFFF);
-      bytecount = ~(pciread32(dev, 0x10 + (int)barno * 4) & 0xFFFFFFF0) + 0x1;
-      pciwrite32(dev, 0x10 + (int)barno * 4, (uint32_t)address);
+      conf->bar[(int)barno] = 0xFFFFFFFF;
+      bytecount = ~(conf->bar[(int)barno] & 0xFFFFFFF0) + 1;
+      conf->bar[(int)barno] = (uint32_t)address;
       break;
     case 0x4:
       // 64-bit
-      address |= (uint64_t)pciread32(dev, 0x14 + (int)barno * 4) << 32;
-      pciwrite32(dev, 0x10 + (int)barno * 4, 0xFFFFFFFF);
-      pciwrite32(dev, 0x14 + (int)barno * 4, 0xFFFFFFFF);
-      bytecount = ~((((uint64_t)pciread32(dev, 0x14 + (int)barno * 4) << 32) | pciread32(dev, 0x10 + (int)barno * 4)) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;
-      pciwrite32(dev, 0x10 + (int)barno * 4, (uint32_t)address);
-      pciwrite32(dev, 0x14 + (int)barno * 4, (uint32_t)(address >> 32));
+      address |= (uint64_t)conf->bar[(int)barno + 1] << 32;
+      conf->bar[(int)barno] = 0xFFFFFFFF;
+      conf->bar[(int)barno + 1] = 0xFFFFFFFF;
+      bytecount = ~((((uint64_t)conf->bar[(int)barno + 1] << 32) | conf->bar[(int)barno]) & 0xFFFFFFFFFFFFFFF0ULL) + 0x1;
+      conf->bar[(int)barno] = (uint32_t)address;
+      conf->bar[(int)barno + 1] = (uint32_t)(address >> 32);
       break;
     default:
     // invalid or IO space
