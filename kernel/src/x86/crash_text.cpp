@@ -56,6 +56,7 @@ struct registers {
     uint64_t rcx;
     uint64_t rbx;
     uint64_t rax;
+    uint64_t exception;
     uint64_t errorcode;
     uint64_t rip;
     uint64_t cs;
@@ -66,7 +67,7 @@ struct registers {
 
 [[noreturn]] void unhandled_interrupt_(const registers* regs) {
   clearscreen();
-  debug("\x1b[31mUnhandled exception/interrupt\x1b[0m\n");
+  debug("\x1b[31mUnhandled exception/interrupt 0x{02x}\x1b[0m\n", regs->exception);
   debug("rip={16x} rfl={16x} errc={x}\n\n", regs->rip, regs->rflags, regs->errorcode);
   debug("rax={16x} rbx={16x}\n", regs->rax, regs->rbx);
   debug("rcx={16x} rdx={16x}\n", regs->rcx, regs->rdx);

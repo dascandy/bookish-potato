@@ -2,7 +2,7 @@
 
 #include <memory>
 
-namespace std {
+namespace s2 {
 
 template <typename T>
 class function;
@@ -33,7 +33,7 @@ public:
     return _impl->operator()(args...);
   }
 private:
-  std::shared_ptr<wrapI> _impl;
+  s2::shared_ptr<wrapI> _impl;
 };
 
 }

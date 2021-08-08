@@ -1,5 +1,6 @@
 V Bootable on x86 qemu
 V Memory management on x86
+V PCI enumeration x86
 - Interrupt handling on x86 qemu
 - SMP on x86
 
@@ -7,6 +8,7 @@ V Bootable on rpi4
 V RPI4-4gb support
 V Interrupt handling on rpi3b+
 - Interrupt handling on rpi4
+- PCI enumeration rpi4
 - memory management on rpi
 - SMP on rpi
 
@@ -15,8 +17,6 @@ V Interrupt handling on rpi3b+
 - SMP on pinephone
 
 
-V PCI enumeration x86
-- PCI enumeration rpi4
 V XHCI driver
 V USB stack
 V USB HID

@@ -158,6 +158,7 @@ extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   platform_init(platform_data, magic);
   set_utc_offset(1591473338000000 - get_timer_value());
   debug("[ENTRY] End of platform init\n");
+  platform_enable_interrupts();  
 /*
   while (1) {
     interrupt_check();

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "map.h"
+#include "interrupt.h"
 
 struct PciCfgSpace {
   uint32_t vendor_device;
@@ -22,6 +23,7 @@ struct PciCfgSpace {
 
 struct PciDevice {
   PciDevice(uintptr_t cfgSpace);
+  void RegisterInterruptHandler(s2::function<void()> OnInterrupt);
   mapping confSpace;
   volatile PciCfgSpace* conf;
 };

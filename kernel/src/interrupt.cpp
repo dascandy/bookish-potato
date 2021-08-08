@@ -1,18 +1,23 @@
 #include "interrupt.h"
 #include <cstddef>
+#include <flatmap>
+#include "debug.h"
 
-void (*handlers[80])();
-interrupt_handler int_handlers[80];
-int last_handler = 0;
+s2::flatmap<uint32_t, s2::vector<s2::function<void()>>> handlers;
 
-void interrupt_check() {
-  for (size_t n = 0; n < last_handler; n++) {
-    int_handlers[n]();
+void interrupt_check(int vector) {
+  auto it = handlers.find(vector);
+  if (it == handlers.end()) {
+    debug("[INT] Unknown interrupt vector {} triggered? Nobody is listening.\n", (uint32_t)vector);
+  } else {
+    for (auto& h : it->second) {
+      h();
+    }
   }
 }
 
-void interrupt_register(interrupt_handler handler) {
-  int_handlers[last_handler++] = handler;
+void interrupt_register(uint32_t vector, s2::function<void()> handler) {
+  handlers[vector].push_back(handler);
 }
 
 

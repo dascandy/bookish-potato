@@ -148,4 +148,8 @@ PciDevice::PciDevice(uintptr_t cfgSpace)
 , conf((volatile PciCfgSpace*)confSpace.get())
 {}
 
+void PciDevice::RegisterInterruptHandler(s2::function<void()> OnInterrupt) {
+
+}
+
 
