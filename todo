@@ -1,7 +1,7 @@
 V Bootable on x86 qemu
 V Memory management on x86
 V PCI enumeration x86
-- Interrupt handling on x86 qemu
+V Interrupt handling on x86 qemu
 - SMP on x86
 
 V Bootable on rpi4

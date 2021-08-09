@@ -4,6 +4,7 @@
 #include "asa.h"
 #include "pci.h"
 #include "debug.h"
+#include <cassert>
 
 struct pte {
         uint64_t p:1;
@@ -170,6 +171,7 @@ mapping::mapping(uintptr_t address, size_t bytes, MappingUse use)
 
 mapping::mapping(volatile PciCfgSpace* conf, PciBars barno, MappingUse use) 
 {
+  assert((uint32_t)barno < 6);
   address = conf->bar[(int)barno];
   switch (address & 0x7) {
     case 0x0:

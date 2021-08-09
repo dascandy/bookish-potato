@@ -27,11 +27,11 @@ constexpr uint64_t RT_CRCR = 0x18;
 constexpr uint64_t RT_DCBAAP = 0x30;
 constexpr uint64_t RT_CONFIG = 0x38;
 
-constexpr uint64_t RT_ERSTSZ = 0x28;
-constexpr uint64_t RT_ERDP = 0x38;
-constexpr uint64_t RT_ERSTBA = 0x30;
 constexpr uint64_t RT_IMAN = 0x20;
 constexpr uint64_t RT_IMOD = 0x24;
+constexpr uint64_t RT_ERSTSZ = 0x28;
+constexpr uint64_t RT_ERSTBA = 0x30;
+constexpr uint64_t RT_ERDP = 0x38;
 
 constexpr uint64_t P_SC = 0x00;
 constexpr uint64_t P_PMSC = 0x04;
@@ -308,6 +308,7 @@ XhciDevice::XhciDevice(uintptr_t confSpacePtr)
   mmio_write<uint64_t>(opregs + RT_CRCR, commandRingPhysical + 1);
 
   // Map event ring (1 page only, but requires indirection) and enable interrupts for when it gets events
+  RegisterInterruptHandler([this]{HandleInterrupt(); });
   uint64_t erst = freepage_get_zeroed();
   mapping evtSegm(erst, 0x1000, DeviceMemory);
   uint64_t eventRingPhysical = freepage_get_zeroed();
@@ -338,10 +339,6 @@ XhciDevice::XhciDevice(uintptr_t confSpacePtr)
       // Trigger a reset, so that we will get a PORT_STATUS_CHANGE for this port
       mmio_write<uint32_t>(op_port + P_SC, 0x10);
     }
-  }
-
-  for (size_t n = 0; n < 3; n++) {
-    HandleInterrupt();
   }
 }
 
@@ -375,8 +372,14 @@ s2::future<uint64_t> XhciDevice::RunCommand(xhci_command cmd) {
 
 void XhciDevice::HandleInterrupt() {
   debug("[XHCI] Interrupt\n");
+
+  uint32_t status = mmio_read<uint32_t>(opregs + RT_USBSTS);
+  mmio_write<uint32_t>(opregs + RT_USBSTS, status);
+  mmio_write<uint32_t>(rr + RT_IMAN, mmio_read<uint32_t>(rr + RT_IMAN));
+
   xhci_command* cmd = (xhci_command*)eventRing.get();
-  while (true) {
+  size_t toRun = 1;
+  while (toRun--) {
     xhci_command& current = cmd[eventRingIndex];
     if ((current.control & TRB_FLAG_C) != currentEventFlag) {
       break;
@@ -421,6 +424,8 @@ void XhciDevice::HandleInterrupt() {
     }
     eventRingIndex++;
   }
+  mmio_write<uint64_t>(rr + RT_ERDP, eventRing.to_physical(&cmd[eventRingIndex]));
+  debug("[XHCI] Interrupt end\n");
 }
 
 XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t port_entry)
@@ -463,7 +468,7 @@ s2::future<s2::span<const uint8_t>> XhciUsbDevice::RunCommandRequest(uint8_t req
   assert(length <= sizeof(port->buffer));
   if (length > sizeof(port->buffer)) co_return {};
   EnqueueCommand(SetupStage(requestType, request, value, length, index, 3));
-  EnqueueCommand(DataStage(portmap.to_physical(port->buffer), length, 0, true));
+  if (length > 0) EnqueueCommand(DataStage(portmap.to_physical(port->buffer), length, 0, true));
   s2::future<uint64_t> statusResult = host->RegisterStatus(EnqueueCommand(StatusStage()));
   RingDoorbell();
 
@@ -620,7 +625,6 @@ s2::future<void> XhciEndpoint::ReadData(uint64_t physAddr, size_t length) {
   s2::future<uint64_t> statusF = dev.host->RegisterStatus(map.to_physical(&cmd));
   dev.RingDoorbell(endpointId, isIn);
   uint64_t status = co_await statusF;
-  debug("B\n");
   if ((status >> 56) != XHCI_COMPLETION_SUCCESS) {
     debug("[XHCI] Read data request failed\n");
   }
@@ -635,34 +639,24 @@ s2::future<UsbEndpoint*> XhciUsbDevice::StartupEndpoint(EndpointDescriptor& desc
   switch(epType) {
     case 0x01: // iso
     case 0x03: // interrupt
-      epc.a = (desc.interval << 16);
-      epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
-      epc.tr_deq_ptr = ep->address | 1;
-      epc.average = desc.maxPacketSize;// | (desc.maxPacketSize << 16);
+      {
+        uint32_t currentInterval = 125; // usec
+        uint8_t intervalSel = 0;
+        while (currentInterval < 1000 * desc.interval) {
+          currentInterval *= 2;
+          intervalSel++;
+        }
+        epc.a = (intervalSel << 16);
+        epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
+        epc.tr_deq_ptr = ep->address | 1;
+        epc.average = desc.maxPacketSize | (desc.maxPacketSize << 16);
+      }
       break;
     case 0x02:
       // TODO: Bulk
       break;
   }
-/*
-EP Type = Isoch IN, Isoch OUT, Interrupt IN or Interrupt OUT. Refer to Table 6-9 for
-the encoding.
-• Max Packet Size = Endpoint Descriptor:wMaxPacketSize & 07FFh.
-• Max Burst Size = SuperSpeed Endpoint Companion Descriptor:bMaxBurst or
-(Endpoint Descriptor: wMaxPacketSize & 1800h) >> 11.
-• Mult = SuperSpeed Endpoint Companion Descriptor:bmAttributes:Mult field.
-Always ‘0’ for Interrupt endpoints.
-• CErr = 3 for Interrupt endpoints. Enables 3 retries.
-CErr = 0 for Isoch endpoints. Retries are not performed for Isoch endpoints.
-• TR Dequeue Pointer = Start address of the first segment of the previously allocated
-Transfer Ring.
-• Dequeue Cycle State (DCS) = 1. Assuming that all TRBs in the segment referenced
-by the TR Dequeue Pointer have been initialized to ‘0’, this field reflects Cycle bit
-state for valid TRBs written by software.
-• Max ESIT Payload = Refer to section 4.14.2 for value.
-*/
 
-  debug("{08x} {08x} {016x} {08x}\n", epc.a, epc.b, epc.tr_deq_ptr, epc.average);
   port->a = (1 << (epId * 2 + isIn)) | 1;
   port->port.route = (epId + 1) << 27;
 
@@ -683,8 +677,10 @@ s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
     }
     activeInterfaces.clear();
   }
-  
+
+  debug("[XHCI] Set config");
   co_await RunCommandRequest(0, 9, cd[configuration]->configVal, 0, 0);
+  debug("[XHCI] /Set config");
 
   uint8_t* configDesc = (uint8_t*)(cd[configuration]);
   size_t size = cd[configuration]->totalLength;
@@ -711,11 +707,5 @@ s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
     UsbCore::Instance().RegisterUsbInterface(*i);
   }
 }
-
-
-
-
-
-
 
 

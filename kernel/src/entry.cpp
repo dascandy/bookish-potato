@@ -113,20 +113,6 @@ void platform_init(void* platform_data, uint32_t magic) {
 
 void timer_init(uintptr_t base);
 
-future<void> f() {
-  // Automatic after integrating network and ntp
-  uint64_t currentTime = 1591308000000000ULL;
-  set_utc_offset(currentTime - get_timer_value());
-  debug("[PLAT] set utc offset\n");
-  while (true) {
-    currentTime += 1000000;
-    co_await wait_until(currentTime);
-    uint64_t time = (currentTime - 1591308000000000ULL) / 1000000;
-    debug("[PLAT] {}:{}:{}     ", time / 3600, (time / 60) % 60, time % 60);
-    debug("ctime = {}\n", currentTime);
-  }
-}
-
 void interrupt_check();
 
 void platform_init(void* platform_data, uint32_t magic) {
@@ -153,12 +139,26 @@ extern "C" void kernel_secondary_cpu() {
   while (1) {}
 }
 
+s2::future<void> f() {
+  // Automatic after integrating network and ntp
+  uint64_t currentTime = 1591308000000000ULL;
+  set_utc_offset(currentTime - get_timer_value());
+  debug("[PLAT] set utc offset\n");
+  while (true) {
+    currentTime += 1000000;
+    co_await wait_until(currentTime);
+    uint64_t time = (currentTime - 1591308000000000ULL) / 1000000;
+    debug("[PLAT] {}:{}:{}     \r", time / 3600, (time / 60) % 60, time % 60);
+  }
+}
+
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   asa_init();
   platform_init(platform_data, magic);
   set_utc_offset(1591473338000000 - get_timer_value());
   debug("[ENTRY] End of platform init\n");
   platform_enable_interrupts();  
+  f();
 /*
   while (1) {
     interrupt_check();

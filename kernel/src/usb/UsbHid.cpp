@@ -196,10 +196,6 @@ s2::future<void> UsbHidDevice::start() {
   size_t len = 0;
   assert(desc != nullptr);
   assert(in_ep != nullptr);
-  debug("EP {} {} {} {}\n", in_ep->address, in_ep->attributes, in_ep->maxPacketSize, in_ep->interval);
-  if (out_ep != nullptr) { // it's optional
-    debug("OUT EP {} {} {} {}\n", out_ep->address, out_ep->attributes, out_ep->maxPacketSize, out_ep->interval);
-  }
   for (size_t n = 0; n < desc->numDescriptors; n++) {
     if (desc->entries[n].descriptorType == (int)DescriptorType::Report) {
       len = desc->entries[n].descriptorLength;

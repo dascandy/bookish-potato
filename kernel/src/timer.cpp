@@ -61,7 +61,6 @@ void set_utc_offset(uint64_t utc_offset) {
 event wait_until(uint64_t count) {
   for (auto& e : entries) {
     if (e.expire == 0) {
-      debug("wait-until {} {}\n", count, get_current_time());
       e.expire = 0x8000000000000000ull | count;
       timer_check();
       return e.p;

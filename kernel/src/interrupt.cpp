@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <flatmap>
 #include "debug.h"
+#include <cassert>
 
 s2::flatmap<uint32_t, s2::vector<s2::function<void()>>> handlers;
 
@@ -13,11 +14,22 @@ void interrupt_check(int vector) {
     for (auto& h : it->second) {
       h();
     }
+    for (auto& h : handlers[254]) {
+      h();
+    }
   }
+  plat_endofinterrupt();
 }
 
 void interrupt_register(uint32_t vector, s2::function<void()> handler) {
   handlers[vector].push_back(handler);
+}
+
+uint32_t get_empty_interrupt_vector() {
+  for (size_t n = 255; n >= 32; n--) {
+    if (handlers[n].empty()) return n;
+  }
+  assert(!"TODO: add support for scanning the table again for most-empty interrupt handler\n");
 }
 
 
