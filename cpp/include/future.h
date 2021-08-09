@@ -160,6 +160,10 @@ public:
     }
     v = EmptyValue();
     cv.notify_all();
+    for (auto& aw : awaitings) {
+      aw.resume();
+    }
+    awaitings.clear();
   }
   void get() {
     s2::unique_lock<s2::mutex> l(m);
