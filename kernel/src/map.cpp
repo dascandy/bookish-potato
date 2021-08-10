@@ -2,7 +2,7 @@
 #include "freepage.h"
 #include "map.h"
 #include "asa.h"
-#include "pci.h"
+#include "pci/PciCore.h"
 #include "debug.h"
 #include <cassert>
 

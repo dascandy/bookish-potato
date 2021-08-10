@@ -1,15 +1,79 @@
-#include "pci.h"
-#include "io.h"
-#include "nvme.h"
-#include "usb/xhci.h"
+#include "pci/PciCore.h"
 #include "debug.h"
-#include "bga.h"
-#include "virtiogpu.h"
+#include "io.h"
+#include <string>
 
-/*
-PciBridge::PciBridge(pcidevice dev, uint8_t subbusid) {}
-void PciBridge::AddDevice(pcidevice dev, PciDevice* devobj) {}
-*/
+PciBridge::PciBridge(uintptr_t dev, uint8_t bus)
+: PciDevice(dev)
+{
+  if (dev != 0) {
+    bus = (conf->bar[2] >> 8) & 0xFF;
+  }
+  uintptr_t busBase = PciCore::Instance().baseaddress[bus];
+  for (size_t slot = 0; slot < 32; slot++) {
+    size_t num_functions = 1;
+    for (size_t function = 0; function < num_functions; function++) {
+      uintptr_t cfgAddress = busBase + function * 4096 + slot * 32768;
+      mapping cfg(cfgAddress, 0x1000, DeviceRegisters);
+      volatile PciCfgSpace* conf = (volatile PciCfgSpace*)cfg.get();
+
+      if (conf->vendor_device == 0 || conf->vendor_device == 0xFFFFFFFF)
+        continue;
+      if ((conf->cache & 0x800000) != 0)
+        num_functions = 8;
+
+      uint16_t device = conf->vendor_device >> 16;
+      uint16_t vendor = conf->vendor_device & 0xFFFF;
+      uint32_t devClass = (conf->classcode & 0xFFFFFF00) >> 8;
+      PciDevice* dev = PciCore::Instance().RegisterPciDevice(cfgAddress, (vendor << 16) | device, devClass);
+      if (dev) 
+        RegisterDevice(dev);
+    }
+  }
+}
+
+void PciBridge::RegisterDevice(PciDevice* devobj) {
+  devices.push_back(devobj);
+}
+
+PciCore& PciCore::Instance() {
+  static PciCore core;
+  return core;
+}
+
+void PciCore::RegisterVidPidDriver(uint16_t vid, uint16_t pid, s2::function<PciDevice*(uintptr_t cfgSpace)> driver) {
+  pidVidDrivers.emplace(((uint32_t)vid << 16) | pid, driver);
+}
+
+void PciCore::RegisterClassDriver(uint32_t classId, s2::function<PciDevice*(uintptr_t cfgSpace)> driver) {
+  classDrivers.emplace(classId, driver);
+}
+
+PciDevice* PciCore::RegisterPciDevice(uintptr_t configSpace, uint32_t vendorDevice, uint32_t deviceClass) {
+  if (auto it = pidVidDrivers.find(vendorDevice); it != pidVidDrivers.end()) {
+    return it->second(configSpace);
+  } else if (auto it1 = classDrivers.find(deviceClass); it1 != classDrivers.end()) {
+    return it1->second(configSpace);
+  } else if (auto it2 = classDrivers.find(deviceClass & 0xFFFF00); it2 != classDrivers.end()) {
+    return it2->second(configSpace);
+  } else if (auto it3 = classDrivers.find(deviceClass & 0xFF0000); it3 != classDrivers.end()) {
+    return it3->second(configSpace);
+  } else {
+    debug("[PCI] Unimplemented device {x}/{x} {x}:{x}:{x} found\n", 
+        vendorDevice >> 16, vendorDevice & 0xFFFF,
+        (deviceClass >> 16) & 0xFF, (deviceClass >> 8) & 0xFF, (deviceClass) & 0xFF);
+
+    // TODO: create placeholder device for device tree exposure
+    return nullptr;
+  }
+}
+
+void PciCore::RegisterBusAddress(uintptr_t base, uint8_t busId, uint8_t busCount) {
+  for (uint8_t id = busId; id < busId + busCount; id++) {
+    baseaddress[id] = base;
+    base += 1048576;
+  }
+}
 
 const char* pci_caps[] = {
   "-",
@@ -73,37 +137,6 @@ void pci_debug_print_device(uint16_t vendor, uint16_t device, uint32_t devClass)
   else 
     debug("unknown");
   debug(")");
-}
-
-PciDevice* pci_find_driver(uintptr_t cfgAddress, uint16_t vendor, uint16_t device, uint32_t devClass) {
-  // 0. if it's a bridge, make it a bridge
-  /*
-  uint8_t header = pciread8(dev, 0x0E);
-  if ( (header & 0x7F) == 0x01 )
-  {
-    uint8_t subbusid = pciread8(dev, 0x19);
-    return pci_handle_bridge(dev, subbusid);
-  }
-  */
-
-  // 1. find match for vendor/device
-#ifdef __x86_64__
-  if (vendor == 0x1234 && device == 0x1111) {
-    new BgaFramebuffer(cfgAddress);
-  } else if (vendor == 0x1af4 && device == 0x1050) {
-    new VirtioGpu(cfgAddress);
-  }
-#endif
-
-  // 2. find match for device class
-  if (devClass == 0x010802) {
-    return new NvmeDevice(cfgAddress);
-  } else if (devClass == 0x0c0330) {
-    return new XhciDevice(cfgAddress);
-  }
-
-  // 3. give up
-  return nullptr;
 }
 
 enum class PciCapability {
@@ -181,36 +214,6 @@ struct CapIterator {
   volatile uint8_t* p;
   uint8_t cap;
 };
-
-PciDevice* pci_discover(uintptr_t hwAddress, uint8_t busCount) {
-  for (size_t bus = 0; bus < busCount; bus++) {
-    for (size_t slot = 0; slot < 32; slot++) {
-      size_t num_functions = 1;
-      for (size_t function = 0; function < num_functions; function++) {
-        uintptr_t cfgAddress = hwAddress + bus * 1048576 + function * 4096 + slot * 32768;
-        mapping cfg(cfgAddress, 0x1000, DeviceRegisters);
-        volatile PciCfgSpace* conf = (volatile PciCfgSpace*)cfg.get();
-
-        if (conf->vendor_device == 0 || conf->vendor_device == 0xFFFFFFFF)
-          continue;
-        if ((conf->cache & 0x800000) != 0)
-          num_functions = 8;
-
-        uint16_t device = conf->vendor_device >> 16;
-        uint16_t vendor = conf->vendor_device & 0xFFFF;
-        uint32_t devClass = (conf->classcode & 0xFFFFFF00) >> 8;
-        pci_debug_print_device(vendor, device, devClass);
-        debug(" cap( ");
-        for (auto [cap, ptr] : CapIterator((volatile uint8_t*)conf, conf->cap_ptr)) {
-          debug("{} ", to_string(cap));
-        }
-        debug(")\n");
-        pci_find_driver(cfgAddress, vendor, device, devClass);
-      }
-    }
-  }
-  return nullptr;
-}
 
 PciDevice::PciDevice(uintptr_t cfgSpace)
 : confSpace(cfgSpace, 0x1000, DeviceRegisters)

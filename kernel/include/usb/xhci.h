@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pci.h"
+#include "pci/PciCore.h"
 #include <cstdint>
 #include <cstddef>
 #include <vector>

@@ -14,9 +14,6 @@ void interrupt_check(int vector) {
     for (auto& h : it->second) {
       h();
     }
-    for (auto& h : handlers[254]) {
-      h();
-    }
   }
   plat_endofinterrupt();
 }

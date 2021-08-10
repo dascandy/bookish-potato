@@ -1,10 +1,9 @@
-#include "bga.h"
+#include "pci/bga.h"
 #include "io.h"
-#include "pci.h"
+#include "pci/PciCore.h"
 #include "map.h"
 #include "debug.h"
 
-#ifdef __x86_64__
 enum BgaReg {
   Id,
   XRes,
@@ -100,5 +99,4 @@ void* BgaFramebuffer::BgaScreen::GetFreeBuffer() {
   return (void*)((uintptr_t)map.get() + bufferToReturn * (xres * yres * 4));
 }
 
-#endif
 

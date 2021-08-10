@@ -1,6 +1,6 @@
-#include "virtiogpu.h"
+#include "pci/virtiogpu.h"
 #include "io.h"
-#include "pci.h"
+#include "pci/PciCore.h"
 #include "map.h"
 #include "debug.h"
 

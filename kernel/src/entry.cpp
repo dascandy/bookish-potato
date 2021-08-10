@@ -6,7 +6,7 @@
 #include "debug.h"
 #include "x86/acpi.h"
 #include "x86/apic.h"
-#include "pci.h"
+#include "pci/PciDrivers.h"
 #include "future.h"
 #include "freepage.h"
 #include "asa.h"
@@ -98,8 +98,6 @@ void platform_init(void* platform_data, uint32_t magic) {
   } else {
     debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
   }
-//  init_pci_drivers();
-  init_usb_drivers();
   acpi_init();
 //  pci_handle_bridge(0, 0);
 }
@@ -129,7 +127,6 @@ void platform_init(void* platform_data, uint32_t magic) {
   RpiFramebuffer* fb = RpiFramebuffer::Create();
   debug("[PLAT] Found monitor {s} {s} serial# {s} at resolution {}x{}\n", fb->m.brand, fb->m.name, fb->m.serial, fb->m.width, fb->m.height);
 
-  init_usb_drivers();
 //  sd_init(model.mmio_base + 0x00300000);
 }
 
@@ -154,6 +151,8 @@ s2::future<void> f() {
 
 extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   asa_init();
+  init_pci_drivers();
+  init_usb_drivers();
   platform_init(platform_data, magic);
   set_utc_offset(1591473338000000 - get_timer_value());
   debug("[ENTRY] End of platform init\n");

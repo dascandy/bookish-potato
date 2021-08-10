@@ -4,7 +4,7 @@
 #include "debug.h"
 #include "map.h"
 #include "timer.h"
-#include "pci.h"
+#include "pci/PciCore.h"
 
 #ifdef __x86_64__
 struct ACPIHeader {
@@ -58,10 +58,11 @@ void parseMcfg(const ACPIHeader* table) {
   McfgBody* body = (McfgBody*)((uint8_t*)table + 44);
   debug("[ACPI] Found MCFG at {} size {}\n", table, table->Length);
   for (size_t n = 0; n < count; n++) {
-    debug("[ACPI] Running PCI discover on bridge {016x} for bus {}-{}\n", body[n].baseAddress, body[n].startBus, body[n].endBus);
-    pci_discover(body[n].baseAddress, body[n].endBus - body[n].startBus);
-    debug("[ACPI] Finished PCI discover on bridge {016x} for bus {}-{}\n", body[n].baseAddress, body[n].startBus, body[n].endBus);
+    PciCore::Instance().RegisterBusAddress(body[n].baseAddress, body[n].startBus, body[n].endBus - body[n].startBus);
   }
+  debug("[ACPI] Running PCI discover\n");
+  PciBridge* root = new PciBridge(0, 0);
+  debug("[ACPI] Finished PCI discover\n");
 }
 
 void tryAcpiTable(uintptr_t address) {

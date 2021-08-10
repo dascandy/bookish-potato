@@ -29,6 +29,8 @@ public:
   : _impl(new wrap<T>(t))
   {
   }
+  function() {}
+  explicit operator bool() { return _impl.get() != nullptr; }
   R operator()(Args... args) const {
     return _impl->operator()(args...);
   }

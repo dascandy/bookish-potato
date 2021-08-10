@@ -1,5 +1,5 @@
 #include "usb/xhci.h"
-#include "pci.h"
+#include "pci/PciCore.h"
 #include "debug.h"
 #include "io.h"
 #include "map.h"
@@ -375,7 +375,7 @@ void XhciDevice::HandleInterrupt() {
 
   uint32_t status = mmio_read<uint32_t>(opregs + RT_USBSTS);
   mmio_write<uint32_t>(opregs + RT_USBSTS, status);
-  mmio_write<uint32_t>(rr + RT_IMAN, mmio_read<uint32_t>(rr + RT_IMAN));
+  mmio_write<uint32_t>(rr + RT_IMAN, mmio_read<uint32_t>(rr + RT_IMAN) | 2);
 
   xhci_command* cmd = (xhci_command*)eventRing.get();
   size_t toRun = 1;
@@ -424,7 +424,7 @@ void XhciDevice::HandleInterrupt() {
     }
     eventRingIndex++;
   }
-  mmio_write<uint64_t>(rr + RT_ERDP, eventRing.to_physical(&cmd[eventRingIndex]));
+  mmio_write<uint64_t>(rr + RT_ERDP, eventRing.to_physical(&cmd[eventRingIndex]) | 8);
   debug("[XHCI] Interrupt end\n");
 }
 
