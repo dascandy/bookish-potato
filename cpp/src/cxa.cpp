@@ -9,6 +9,7 @@ extern "C" void __cxa_guard_abort (__guard *);
 
 extern "C" int __cxa_guard_acquire (__guard *g) 
 {
+  (void)g;
   return 1;
 }
 
@@ -26,13 +27,17 @@ extern "C" void __cxa_pure_virtual()
 {
 }
 
-extern "C" void *__dso_handle = 0; //Attention! Optimally, you should remove the '= 0' part and define this in your asm script.
+extern "C" void *__dso_handle = 0;
 
 extern "C" int __cxa_atexit(void (*f)(void *), void *objptr, void *dso)
 {
+  (void)f;
+  (void)objptr;
+  (void)dso;
 	return 0;
 }
 
 extern "C" void __cxa_finalize(void *f)
 {
+  (void)f;
 }

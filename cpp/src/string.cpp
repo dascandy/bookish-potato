@@ -4,6 +4,12 @@
 #include <stdio.h>
 #include <cassert>
 
+size_t strnlen(const char* str, size_t maxN) {
+  size_t n = 0;
+  while (n < maxN && str[n]) n++;
+  return n;
+}
+
 size_t strlen(const char *str) {
   size_t n = 0;
   while (str[n]) n++;

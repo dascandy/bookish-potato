@@ -1,7 +1,6 @@
 #include "interrupt.h"
 #include "map.h"
 #include <cstdint>
-#include "crash.h"
 #include "io.h"
 #include <cstring>
 #include "debug.h"

@@ -5,6 +5,7 @@
 void cpu_init() {
   auto zero = cpuid(0);
   uint32_t max = zero.eax;
+  (void)max;
   char CpuVendor[13] = {};
   memcpy(CpuVendor, &zero.ebx, 4);
   memcpy(CpuVendor + 4, &zero.edx, 4);

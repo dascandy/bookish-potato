@@ -62,6 +62,7 @@ void parseMcfg(const ACPIHeader* table) {
   }
   debug("[ACPI] Running PCI discover\n");
   PciBridge* root = new PciBridge(0, 0);
+  (void)root;
   debug("[ACPI] Finished PCI discover\n");
 }
 

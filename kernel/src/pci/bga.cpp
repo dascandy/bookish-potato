@@ -22,7 +22,7 @@ BgaFramebuffer::BgaFramebuffer(uintptr_t confSpaceAddr)
 , regs(conf, PciBars::Bar2)
 , screen(conf, regs.get())
 {
-  uintptr_t p = (uintptr_t)regs.get();
+//  uintptr_t p = (uintptr_t)regs.get();
 }
 
 //    uint32_t *buffer;
@@ -59,7 +59,7 @@ bool BgaFramebuffer::BgaScreen::SetActiveResolution(const Resolution& res, size_
 }
 
 s2::future<void> BgaFramebuffer::BgaScreen::QueueBuffer(void* ptr) {
-    uint8_t displayBufferId, queuedBufferId, bufferCount;
+  uint8_t displayBufferId;
   switch(bufferCount) {
   case 1:
     return {};

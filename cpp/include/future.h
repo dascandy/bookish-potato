@@ -15,7 +15,7 @@ template <typename T>
 struct shared_state {
 public:
   shared_state& operator=(const shared_state&) = delete;
-  void set_value(T value) {
+  void set_value(T&& value) {
     s2::unique_lock<s2::mutex> l(m);
     if (is_ready()) {
       assert(false);
@@ -35,6 +35,7 @@ public:
         return s2::get<T>(v);
       default:
         assert(false);
+        __builtin_unreachable();
     }
   }
   bool is_empty() {
@@ -88,7 +89,7 @@ struct promise {
   auto get_future() noexcept {
     return future<T>{state};
   }
-  auto return_value(T v) {
+  auto return_value(T&& v) {
     state->set_value(s2::move(v));
     return std::experimental::suspend_never{};
   }

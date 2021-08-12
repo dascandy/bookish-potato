@@ -16,7 +16,7 @@ public:
   };
   VirtioGpu(uintptr_t confSpaceAddr);
   size_t getScreenCount() { return 1; }
-  Screen* getScreen(size_t n) { return &screen; }
+  Screen* getScreen(size_t) { return &screen; }
 private:
   VirtioGpuScreen screen;
 };

@@ -18,10 +18,13 @@ VirtioGpu::VirtioGpuScreen::VirtioGpuScreen(s2::span<const uint8_t> edid)
 }
 
 bool VirtioGpu::VirtioGpuScreen::SetActiveResolution(const Resolution& res, size_t bufferCount) {
+  (void)res;
+  (void)bufferCount;
   return true;
 }
 
 s2::future<void> VirtioGpu::VirtioGpuScreen::QueueBuffer(void* ptr) {
+  (void)ptr;
   return {};
 }
 

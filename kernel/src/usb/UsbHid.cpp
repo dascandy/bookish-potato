@@ -97,7 +97,7 @@ struct ReportState {
 void UsbHidDevice::ParseReport(s2::span<const uint8_t> data) {
   ReportState state;
   s2::vector<uint32_t> usages;
-  uint16_t usageMin = 0, usageMax = 0;
+  uint32_t usageMin = 0, usageMax = 0;
   uint16_t inputOffset = 0, outputOffset = 0;
   ReportIterator it{data.data(), data.data() + data.size()};
 
@@ -118,22 +118,33 @@ void UsbHidDevice::ParseReport(s2::span<const uint8_t> data) {
                 usageMin++;
               } else {
                 currentUsage = usages[0];
-                for (size_t n = 0; n < usages.size() - 1; n++) {
-                  usages[n] = usages[n+1];
+                if (usages.size() > 1) {
+                  for (size_t n = 0; n < usages.size() - 1; n++) {
+                    usages[n] = usages[n+1];
+                  }
+                  usages.pop_back();
                 }
-                usages.pop_back();
               }
             } else {
               currentUsage = usageMin;
             }
-            currentUsage |= (state.usagePage << 16);
-            t.push_back(HidField{currentUsage, offset, state.reportSize, not isVariable});
+            t.push_back(HidField{currentUsage, offset, state.reportSize, not isVariable, isRelative});
           }
           offset += state.reportSize;
         }
+        usages.clear();
       }
         break;
-      case Collection: usages.clear(); break;
+      case Collection: 
+        if (v == 1) {
+          deviceType = (Type)usages.back();
+          usages.pop_back();
+        } else {
+          debug("Collection {x} {x}\n", v, usages.back()); 
+          usages.pop_back();
+        }
+        break;
+
       case CollectionEnd: break;
 
       case UsagePage: state.usagePage = v; break;
@@ -149,9 +160,9 @@ void UsbHidDevice::ParseReport(s2::span<const uint8_t> data) {
       case Push: debug("Push {x}\n", v); break;
       case Pop: debug("Pop {x}\n", v); break;
 
-      case Usage: usages.push_back(v); break;
-      case UsageMinimum: usageMin = v; break;
-      case UsageMaximum: usageMax = v; break;
+      case Usage: usages.push_back((state.usagePage << 16) | v); break;
+      case UsageMinimum: usages.clear(); usageMin = (state.usagePage << 16) | v; break;
+      case UsageMaximum: usageMax = (state.usagePage << 16) | v; break;
 
       case DesignatorIndex: debug("DesignatorIndex {x}\n", v); break;
       case DesignatorMinimum: debug("DesignatorMinimum {x}\n", v); break;
@@ -220,13 +231,35 @@ s2::future<void> UsbHidDevice::start() {
 }
 
 void UsbHidDevice::HandleReport(s2::span<const uint8_t> report) {
-  for (auto& c : report) {
-    debug("{2x} ", c);
+  s2::flatmap<uint32_t, int16_t> status;
+  for (auto& f : input) {
+    uint8_t firstByte = (f.bitOffset / 8);
+    uint8_t lastByte = (f.bitOffset + f.bitLength - 1) / 8;
+    uint64_t val = 0;
+    uint8_t shift = 0;
+    while (firstByte <= lastByte) {
+      val |= report[firstByte] << shift;
+      shift += 8;
+      firstByte++;
+    }
+    val >>= (f.bitOffset - (f.bitOffset / 8) * 8);
+    val &= (1 << f.bitLength) - 1;
+    if (f.isIndex) {
+      if (val != 0) // TODO: check if this is not a hack
+        status[f.usage + val] = 1;
+    } else if (f.isRelative) {
+      status[f.usage] = val;
+    } else {
+      if (val != 0) // same, check if this is okay to do in general
+        status[f.usage] = val;
+    }
   }
-  debug("\n");
+  for (auto [k,v] : status) {
+    debug("{x}: {}\n", k, v);
+  }
 }
 
-void UsbHid::AddDevice(UsbDevice& dev) {}
+void UsbHid::AddDevice(UsbDevice&) {}
 
 void UsbHid::AddInterface(UsbInterface& interface) {
   (new UsbHidDevice(interface))->start();

@@ -1,34 +1,6 @@
-#include "crash.h"
 #include "debug.h"
 
 #ifdef __x86_64__
-static const char hextab[] = "0123456789abcdef";
-void crash_hexdump_region(size_t y, const uint8_t* num, size_t length, uint8_t attributes) {
-  for (size_t n = 0; n < length; n++) {
-    debug_char((attributes << 8) | hextab[num[n] >> 4]);
-    debug_char((attributes << 8) | hextab[num[n] & 0xF]);
-    debug_char(' ');
-    if (n % 16 == 7) {
-      debug_char(' ');
-    }
-    if (n % 16 == 15) {
-      debug_char('\n');
-    }
-  }
-}
-
-void crash_hexdump(size_t x, size_t y, const uint8_t* num, size_t length, uint8_t attributes) {
-  for (size_t n = 0; n < length; n++) {
-    debug_char((attributes << 8) | hextab[num[length-n-1] >> 4]);
-    debug_char((attributes << 8) | hextab[num[length-n-1] & 0xF]);
-  }
-}
-
-void crash_text(size_t x, size_t y, const char* text, uint8_t attributes) {
-  while (*text) {
-    debug_char(*text++);
-  }
-}
 
 static void clearscreen() {
   for (size_t n = 0; n < 3; n++) {

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include "freepage.h"
 
 enum MappingUse {
   DeviceRegisters,
@@ -35,9 +36,35 @@ struct mapping {
   uint64_t to_physical(void* p);
   ~mapping();
   void* get();
-  uintptr_t address;
-  uintptr_t virtaddr;
   size_t bytecount;
+  uintptr_t virtaddr;
+  uintptr_t address;
   size_t offset;
 };
+
+template <typename T>
+struct RegisterMapping : mapping {
+  RegisterMapping() {}
+  RegisterMapping(uintptr_t address) : mapping(address, sizeof(T), MappingUse::DeviceRegisters) {}
+  RegisterMapping(volatile PciCfgSpace* conf, PciBars barno) : mapping(conf, barno, MappingUse::DeviceRegisters) {}
+  ~RegisterMapping() {}
+  volatile T* operator->() { return (volatile T*)get(); }
+};
+
+struct IoMemory {
+  IoMemory(size_t pagecount) :
+  m(freepage_get_range(pagecount), pagecount * 0x1000, DeviceMemory)
+  {
+  }
+  ~IoMemory() {
+
+  }
+  IoMemory& operator=(IoMemory&&) = default;
+  IoMemory(IoMemory&&) = default;
+  uint8_t* get() { return (uint8_t*)m.get(); }
+  uintptr_t hwaddress() { return m.to_physical(m.get()); }
+private:
+  mapping m;
+};
+
 

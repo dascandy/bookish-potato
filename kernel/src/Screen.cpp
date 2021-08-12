@@ -152,10 +152,10 @@ Screen::Screen(uint16_t xres, uint16_t yres)
 : widthMm(xres/4)
 , heightMm(yres/4)
 , dotsPerInch(96)
-, name("VM Screen")
 , connection("VM")
 , manufacturer("VM")
 , serialno("1")
+, name("VM Screen")
 , displayBpp(8)
 {
   supportedResolutions.push_back({xres, yres, PixelFormat::RGBX_8888});

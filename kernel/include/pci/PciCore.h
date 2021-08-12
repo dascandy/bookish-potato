@@ -25,7 +25,7 @@ struct PciCfgSpace {
 
 struct PciDevice {
   PciDevice(uintptr_t cfgSpace);
-  void RegisterInterruptHandler(s2::function<void()> OnInterrupt);
+  void RegisterInterruptHandler(size_t number, s2::function<void()> OnInterrupt);
   mapping confSpace;
   volatile PciCfgSpace* conf;
 };

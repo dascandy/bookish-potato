@@ -23,23 +23,10 @@ uint64_t freepage_get() {
   return page;
 }
 
-enum class DmaType {
-  Unrestricted,
-  Bit32,
-};
-
-static bool matchesDmaType(uint64_t address, size_t pagecount, DmaType type) {
-  switch(type) {
-  default:
-  case DmaType::Unrestricted: return true;
-  case DmaType::Bit32: return (address < 0x100000000) && (address + pagecount * 4096 < 0x100000000);
-  }
-}
-
 // TODO: make it do some work in case there's no range available
-uint64_t freepage_get_range(size_t pagecount, DmaType type) {
+uint64_t freepage_get_range(size_t pagecount) {
   free_page_list* c = head;
-  while (c && (c->pagecount <= pagecount || not matchesDmaType(c->address, pagecount, type))) {
+  while (c && (c->pagecount <= pagecount)) {
     c = c->next;
   }
   // TODO: make it do something better in this case

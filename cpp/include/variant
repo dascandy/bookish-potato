@@ -73,7 +73,15 @@ struct variant {
     new (buffer) typename get_type_by_index<0, types...>::type();
   }
   template <typename T>
-  variant(T value) 
+  variant& operator=(T&& value) 
+  {
+    invoke_on_each([](auto& t) { destruct(t); });
+    index_ = get_index_of_type<0, T, types...>::index;
+    new (buffer) T(s2::move(value));
+    return *this;
+  }
+  template <typename T>
+  variant(T&& value) 
   : index_(get_index_of_type<0, T, types...>::index)
   {
     new (buffer) T(s2::move(value));

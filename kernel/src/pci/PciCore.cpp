@@ -189,7 +189,7 @@ s2::string to_string(PciCapability p) {
     "enhalloc",
     "flatportal",
   };
-  if ((int)p < sizeof(pci_caps) / sizeof(void*)) {
+  if ((size_t)p < sizeof(pci_caps) / sizeof(void*)) {
     return pci_caps[(int)p];
   }
   return "unknown";
@@ -249,43 +249,53 @@ struct MsiXEntry {
   uint32_t flags;
 };
 
-void PciDevice::RegisterInterruptHandler(s2::function<void()> OnInterrupt) {
-  uint32_t vec = get_empty_interrupt_vector();
-  interrupt_register(vec, OnInterrupt);
-  debug("[PCI] Using interrupt vector {}\n", vec);
+void PciDevice::RegisterInterruptHandler(size_t number, s2::function<void()> OnInterrupt) {
+  uint32_t vec;
 
   for (auto [cap, ptr] : CapIterator((volatile uint8_t*)conf, conf->cap_ptr)) {
     if (cap == PciCapability::MSI) {
       uint32_t tptr = 0xFEE00000;
-      uint16_t data = (uint16_t)vec;
       volatile Msi* msi = (volatile Msi*)ptr;
       uint16_t msgControlIn = msi->messageControlReg & 0xFF8F; // ensure we do not enable more than one interrupt
-      if ((msgControlIn & 0x80) == 0x80) {
-        msi->messageAddr = tptr;
-        msi->messageDataReg = data;
+      if (msi->messageDataReg != 0) {
+        vec = msi->messageDataReg;
       } else {
-        volatile Msi32* msi32 = (volatile Msi32*)ptr;
-        msi32->messageAddr = tptr;
-        msi32->messageDataReg = data;
+        vec = get_empty_interrupt_vector();
+        uint16_t data = (uint16_t)vec;
+        if ((msgControlIn & 0x80) == 0x80) {
+          msi->messageAddr = tptr;
+          msi->messageDataReg = data;
+        } else {
+          volatile Msi32* msi32 = (volatile Msi32*)ptr;
+          msi32->messageAddr = tptr;
+          msi32->messageDataReg = data;
+        }
       }
 
       msi->messageControlReg = msgControlIn | 0x1;
+      debug("[PCI] Using MSI interrupt vector {}\n", vec);
+      interrupt_register(vec, OnInterrupt);
       return;
     } else if (cap == PciCapability::MSIX) {
       uint32_t tptr = 0xFEE00000;
+      vec = get_empty_interrupt_vector();
       uint16_t data = (uint16_t)vec;
       volatile MsiX* msix = (volatile MsiX*)ptr;
       uint32_t bar_offset = msix->bar_offset;
       uint32_t barId = bar_offset & 0x7;
       mapping bar(conf, (PciBars)barId);
+//      uint8_t interruptCount = (msix->messageControlReg & 0x7FF) + 1;
 
       uint32_t offset = bar_offset & 0xFFFFFFF8;
       MsiXEntry* list = (MsiXEntry*)((uintptr_t)bar.get() + offset);
-      list[0].address = tptr;
-      list[0].value = data;
-      list[0].flags = 0;
+      debug("[PCI] {} {x}\n", barId, offset);
+      list[number].address = tptr;
+      list[number].value = data;
+      list[number].flags = 0;
       
       msix->messageControlReg = msix->messageControlReg | 0x8000;
+      debug("[PCI] Using MSIX interrupt vector {}\n", vec);
+      interrupt_register(vec, OnInterrupt);
       return;
     }
   }

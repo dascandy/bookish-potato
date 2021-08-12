@@ -52,8 +52,8 @@ s2::vector<const UsbDescriptor*>& UsbInterface::GetInterfaceDescriptors() {
 
 UsbInterface::UsbInterface(UsbDevice& dev, uint8_t id, s2::vector<const UsbDescriptor*> interfaceDescriptor)
 : dev(dev)
-, interfaceNum(id)
 , interfaceDescriptors(interfaceDescriptor)
+, interfaceNum(id)
 {
 }
 

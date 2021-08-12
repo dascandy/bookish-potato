@@ -23,7 +23,7 @@ struct unique_lock {
 
 struct condition_variable {
   template <typename L, typename F>
-  void wait(L&& lock, F&& function) {
+  void wait(L&&, F&&) {
   }
   void notify_one() {}
   void notify_all() {}

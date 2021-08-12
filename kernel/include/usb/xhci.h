@@ -68,9 +68,7 @@ private:
   XhciDevice* host;
   InputContext* port;
   uint8_t slotId;
-  uintptr_t op_port;
   uint8_t portid;
-  bool active;
   DeviceDescriptor dd;
   s2::vector<ConfigurationDescriptor*> cd;
   s2::vector<UsbInterface*> activeInterfaces;

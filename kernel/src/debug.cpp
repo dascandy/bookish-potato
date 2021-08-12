@@ -5,6 +5,7 @@
 static char hextab[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 void debug_field(bool value, s2::string_view spec) {
+  (void)spec;
   debug_field(value ? "true" : "false", "s");
 }
 
@@ -29,6 +30,7 @@ void debug_field(uint64_t value, s2::string_view spec) {
 }
 
 void debug_field(void* value, s2::string_view spec) {
+  (void)spec;
   debug_field((uintptr_t)value, "16x");
 }
 

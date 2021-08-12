@@ -10,18 +10,18 @@
 #include "usb/UsbCore.h"
 
 constexpr uint64_t CR_CAPLENGTH = 0;
-constexpr uint64_t CR_HCIVERSION = 2;
+//constexpr uint64_t CR_HCIVERSION = 2;
 constexpr uint64_t CR_HCSPARAMS1 = 4;
 constexpr uint64_t CR_HCSPARAMS2 = 8;
-constexpr uint64_t CR_HCSPARAMS3 = 12;
-constexpr uint64_t CR_HCCPARAMS1 = 16;
+//constexpr uint64_t CR_HCSPARAMS3 = 12;
+//constexpr uint64_t CR_HCCPARAMS1 = 16;
 constexpr uint64_t CR_DBOFF = 20;
 constexpr uint64_t CR_RTSOFF = 24;
-constexpr uint64_t CR_HCCPARAMS2 = 28;
+//constexpr uint64_t CR_HCCPARAMS2 = 28;
 
 constexpr uint64_t RT_USBCMD = 0x00;
 constexpr uint64_t RT_USBSTS = 0x04;
-constexpr uint64_t RT_PAGESIZE = 0x08;
+//constexpr uint64_t RT_PAGESIZE = 0x08;
 constexpr uint64_t RT_DNCTRL = 0x14;
 constexpr uint64_t RT_CRCR = 0x18;
 constexpr uint64_t RT_DCBAAP = 0x30;
@@ -34,8 +34,8 @@ constexpr uint64_t RT_ERSTBA = 0x30;
 constexpr uint64_t RT_ERDP = 0x38;
 
 constexpr uint64_t P_SC = 0x00;
-constexpr uint64_t P_PMSC = 0x04;
-constexpr uint64_t P_LI = 0x08;
+//constexpr uint64_t P_PMSC = 0x04;
+//constexpr uint64_t P_LI = 0x08;
 
 constexpr uint64_t RT_USBSTS_HCH = 0x1;
 constexpr uint64_t RT_USBCMD_RUN = 0x00000001;
@@ -142,27 +142,6 @@ struct InputContext {
 
 static_assert(sizeof(InputContext) == 0x1000);
 
-
-
-static constexpr const char* plstab[16] = {
-  "U0",
-  "U1",
-  "U2",
-  "U3",
-  "Disabled",
-  "RxDetect",
-  "Inactive",
-  "Polling",
-  "Recovery",
-  "Hot Reset",
-  "Compliance Mode",
-  "Test Mode",
-  "Reserved 12",
-  "Reserved 13",
-  "Reserved 14",
-  "Resume",
-};
-
 namespace {
 
 enum {
@@ -243,6 +222,7 @@ static xhci_command SetupStage(uint8_t requestType, uint8_t request, uint16_t va
 }
 
 static xhci_command DataStage(uint64_t dataBuffer, uint32_t trbBytes, uint8_t td_size, bool writeData) {
+  (void)writeData;
   return { dataBuffer, (td_size << 17) | (trbBytes), TRB_TYPE_DATA_STAGE | TRB_FLAG_DIR | TRB_FLAG_ISP };
 }
 
@@ -308,7 +288,7 @@ XhciDevice::XhciDevice(uintptr_t confSpacePtr)
   mmio_write<uint64_t>(opregs + RT_CRCR, commandRingPhysical + 1);
 
   // Map event ring (1 page only, but requires indirection) and enable interrupts for when it gets events
-  RegisterInterruptHandler([this]{HandleInterrupt(); });
+  RegisterInterruptHandler(0, [this]{HandleInterrupt(); });
   uint64_t erst = freepage_get_zeroed();
   mapping evtSegm(erst, 0x1000, DeviceMemory);
   uint64_t eventRingPhysical = freepage_get_zeroed();
@@ -371,7 +351,7 @@ s2::future<uint64_t> XhciDevice::RunCommand(xhci_command cmd) {
 }
 
 void XhciDevice::HandleInterrupt() {
-  debug("[XHCI] Interrupt\n");
+//  debug("[XHCI] Interrupt\n");
 
   uint32_t status = mmio_read<uint32_t>(opregs + RT_USBSTS);
   mmio_write<uint32_t>(opregs + RT_USBSTS, status);
@@ -396,10 +376,10 @@ void XhciDevice::HandleInterrupt() {
         break;
       case 32: // transfer
       case 33: // command completion
-        debug("[XHCI] Command completion event\n");
+//        debug("[XHCI] Command completion event\n");
         for (size_t n = 0; n < callbacks.size(); n++) {
           if (current.pointer == callbacks[n].addr) {
-            debug("[XHCI] Found handler, informing\n");
+//            debug("[XHCI] Found handler, informing\n");
             callbacks[n].p.set_value(((uint64_t)current.status << 32) | current.control);
             callbacks[n] = s2::move(callbacks.back());
             callbacks.pop_back();
@@ -408,7 +388,7 @@ void XhciDevice::HandleInterrupt() {
         }
         break;
       case 34: // port status change
-        debug("[XHCI] Port status change event\n");
+//        debug("[XHCI] Port status change event\n");
         {
           uint8_t port = ((current.pointer >> 24) & 0xFF) - 1;
           uint64_t op_port = opregs + 0x400 + port*16;
@@ -425,15 +405,14 @@ void XhciDevice::HandleInterrupt() {
     eventRingIndex++;
   }
   mmio_write<uint64_t>(rr + RT_ERDP, eventRing.to_physical(&cmd[eventRingIndex]) | 8);
-  debug("[XHCI] Interrupt end\n");
+//  debug("[XHCI] Interrupt end\n");
 }
 
 XhciUsbDevice::XhciUsbDevice(XhciDevice* host, uint8_t port_entry)
-: host(host)
-, portid(port_entry)
-, portmap(freepage_get_zeroed(), 0x1000, DeviceMemory)
+: portmap(freepage_get_zeroed(), 0x1000, DeviceMemory)
+, host(host)
 , port((InputContext*)portmap.get())
-, active(false)
+, portid(port_entry)
 {
   memset(port, 0, sizeof(*port));
 
@@ -507,6 +486,7 @@ s2::future<bool> XhciUsbDevice::StartUp() {
   uint64_t op_port = host->opregs + 0x400 + portid*16;
   uint32_t sc = mmio_read<uint32_t>(op_port + P_SC);
   uint8_t port_speed = (sc >> 10) & 0xF;
+  (void)port_speed;
 
   uint64_t addr_evt = co_await host->RunCommand(AddressDevice(portmap.to_physical(&port->d), slotId));
   if ((addr_evt >> 56) != XHCI_COMPLETION_SUCCESS) {
@@ -597,7 +577,8 @@ const s2::vector<ConfigurationDescriptor*>& XhciUsbDevice::GetConfigurationDescr
   return cd;
 }
 
-struct XhciEndpoint final : public UsbEndpoint {
+class XhciEndpoint final : public UsbEndpoint {
+public:
   XhciEndpoint(XhciUsbDevice& dev, uint8_t endpointId, bool isIn) 
   : dev(dev)
   , address(freepage_get_zeroed())
@@ -688,7 +669,6 @@ s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
   size_t offset = cd[configuration]->length;
   s2::vector<const UsbDescriptor*> descriptors;
   for (size_t n = 0; offset < size; n++) {
-    uint8_t* start = configDesc + offset;
     UsbDescriptor* desc = (UsbDescriptor*)(configDesc + offset);
     do {
       if (desc->length < 2) {

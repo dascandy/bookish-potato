@@ -22,7 +22,7 @@ public:
   };
   BgaFramebuffer(uintptr_t confSpacePtr);
   size_t getScreenCount() { return 1; }
-  Screen* getScreen(size_t n) { return &screen; }
+  Screen* getScreen(size_t) { return &screen; }
 private:
   mapping regs;
   BgaScreen screen;

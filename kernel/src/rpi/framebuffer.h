@@ -25,7 +25,7 @@ public:
   RpiFramebuffer();
   static RpiFramebuffer* Create();
   size_t getScreenCount() { return 1; }
-  Screen* getScreen(size_t n) { return screen; }
+  Screen* getScreen(size_t) { return screen; }
 private:
   s2::span<uint8_t> ReadEdid(uint8_t* buffer);
   RpiScreen* screen;

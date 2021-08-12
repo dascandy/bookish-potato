@@ -11,6 +11,7 @@ void debug_char(char c) {
 }
 
 void debug_field(s2::string_view text, s2::string_view spec) {
+  (void)spec;
   for (auto& c : text) {
     debug_char(c);
   }

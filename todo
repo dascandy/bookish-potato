@@ -10,18 +10,15 @@ V RPI4-4gb support
 V Interrupt handling on rpi3b+
 V SSL implementation
 V HTTPS client
-
-- SMP on x86
+~ NVMe storage support
+- VFS support
 
 - Interrupt handling on rpi4
 - PCI enumeration rpi4
 - memory management on rpi
-- SMP on rpi
 
 - Bootable on pinephone
 - Interrupt handling on pinephone
-- SMP on pinephone
-
 
 - Network stack IPv6 (SLAAC start)
 - Network driver x86
@@ -36,4 +33,8 @@ V HTTPS client
 
 - POSIX emulation layer
 - Program execution
+
+- SMP on x86
+- SMP on rpi
+- SMP on pinephone
 

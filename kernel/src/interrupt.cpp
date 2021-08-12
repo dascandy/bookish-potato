@@ -27,6 +27,7 @@ uint32_t get_empty_interrupt_vector() {
     if (handlers[n].empty()) return n;
   }
   assert(!"TODO: add support for scanning the table again for most-empty interrupt handler\n");
+  return 0;
 }
 
 

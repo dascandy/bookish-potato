@@ -19,6 +19,9 @@ inline void debug_field(uint32_t value, s2::string_view spec) { debug_field((uin
 inline void debug_field(uint16_t value, s2::string_view spec) { debug_field((uint64_t)value, spec); }
 inline void debug_field(uint8_t value, s2::string_view spec) { debug_field((uint64_t)value, spec); }
 void debug_field(int64_t value, s2::string_view spec);
+inline void debug_field(int32_t value, s2::string_view spec) { debug_field((int64_t)value, spec); }
+inline void debug_field(int16_t value, s2::string_view spec) { debug_field((int64_t)value, spec); }
+inline void debug_field(int8_t value, s2::string_view spec) { debug_field((int64_t)value, spec); }
 void debug_field(s2::string_view text, s2::string_view spec = "");
 
 template <typename T>

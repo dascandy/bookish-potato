@@ -14,11 +14,12 @@ qemu-system-x86_64 -machine q35 --cpu host,+x2apic -enable-kvm \
     -device qemu-xhci,bus=pcie.0 -device usb-kbd -device usb-mouse \
     -drive file=disk.img,if=none,id=D22,driver=file \
     -device nvme,drive=D22,serial=1234 \
-    -d trace:usb_xhci_* \
+    -d trace:*nvme* \
     -debugcon stdio \
     -kernel build/amd64/bin/kernel.i386
 # -nic tap,ipv6=on,ipv4=off,model=e1000,mac=52:54:98:76:54:32
 
+#    -d trace:usb_xhci_* \
 #    -device sdhci-pci --device sd-card \
 #    -device virtio-gpu,bus=pcie.0 \
 

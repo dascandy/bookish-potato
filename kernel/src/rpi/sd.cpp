@@ -109,6 +109,8 @@ enum {
 
 void sd_clk(uintptr_t emmc_base, unsigned int c)
 {
+  (void)emmc_base;
+  (void)c;
   /*
     int cnt = 100000;
     while (mmio_read<uint32_t>(emmc_base + control1) & (SR_CMD_INHIBIT|SR_DAT_INHIBIT) && cnt--) delay();
@@ -142,6 +144,7 @@ void sd_clk(uintptr_t emmc_base, unsigned int c)
 }
 
 void sd_init(uintptr_t sd_base) {
+  (void)sd_base;
   /*
     // Set up pins
     long r,cnt,ccs=0;
