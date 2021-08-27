@@ -89,7 +89,6 @@ void mb2_init(mb2* data) {
 
 void platform_init(void* platform_data, uint32_t magic) {
   cpu_init();
-  Apic::init();
   interrupt_init();
   if (magic == 0x2badb002) {
     mb1_init((mb1*)platform_data);
@@ -98,6 +97,7 @@ void platform_init(void* platform_data, uint32_t magic) {
   } else {
     debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
   }
+  Apic::init();
   acpi_init();
 //  pci_handle_bridge(0, 0);
 }
