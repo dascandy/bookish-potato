@@ -50,7 +50,6 @@ namespace Apic
     } else {
       useMsr = false;
       mmio = mapping(0xFEE00000, 0x1000, DeviceRegisters);
-      wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | 0x800);
     }
 
     write(Spurious, 0x130);
@@ -61,7 +60,7 @@ namespace Apic
     if (useMsr) {
       wrmsr(0x800 + reg, value);
     } else {
-      mmio_write<uint64_t>((uintptr_t)mmio.get() + reg * 0x10, value);
+      mmio_write<uint32_t>((uintptr_t)mmio.get() + reg * 0x10, value);
     }
   }
 
@@ -70,7 +69,7 @@ namespace Apic
     if (useMsr) {
       return rdmsr(0x800 + reg);
     } else {
-      return mmio_read<uint64_t>((uintptr_t)mmio.get() + reg * 0x10);
+      return mmio_read<uint32_t>((uintptr_t)mmio.get() + reg * 0x10);
     }
   }
 
