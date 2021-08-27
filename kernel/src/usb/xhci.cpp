@@ -659,9 +659,7 @@ s2::future<void> XhciUsbDevice::SetConfiguration(uint8_t configuration) {
     activeInterfaces.clear();
   }
 
-  debug("[XHCI] Set config");
   co_await RunCommandRequest(0, 9, cd[configuration]->configVal, 0, 0);
-  debug("[XHCI] /Set config");
 
   uint8_t* configDesc = (uint8_t*)(cd[configuration]);
   size_t size = cd[configuration]->totalLength;
