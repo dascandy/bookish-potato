@@ -7,6 +7,7 @@
 s2::flatmap<uint32_t, s2::vector<s2::function<void()>>> handlers;
 
 void interrupt_check(int vector) {
+  debug("[INT] Got interrupt {}\n", vector);
   auto it = handlers.find(vector);
   if (it == handlers.end()) {
     debug("[INT] Unknown interrupt vector {} triggered? Nobody is listening.\n", (uint32_t)vector);
@@ -16,6 +17,7 @@ void interrupt_check(int vector) {
     }
   }
   plat_endofinterrupt();
+  debug("[INT] Interrupt {} done\n", vector);
 }
 
 void interrupt_register(uint32_t vector, s2::function<void()> handler) {
