@@ -10,6 +10,8 @@
 namespace Apic 
 {
   static const uint32_t IA32_APIC_BASE = 0x1B;
+  static bool useMsr = false;
+  static mapping mmio;
 
   enum {
     LocalAPIC_ID = 2,
@@ -42,21 +44,34 @@ namespace Apic
   }
 
   void init() {
-    assert(isX2());
-
-    wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | 0xC00);
+    if (isX2()) {
+      useMsr = true;
+      wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | 0xC00);
+    } else {
+      useMsr = false;
+      mmio = mapping(0xFEE00000, 0x1000, DeviceRegisters);
+      wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | 0x800);
+    }
 
     write(Spurious, 0x130);
   }
 
   void write(uint8_t reg, uint64_t value)
   {
-    wrmsr(0x800 + reg, value);
+    if (useMsr) {
+      wrmsr(0x800 + reg, value);
+    } else {
+      mmio_write<uint64_t>((uintptr_t)mmio.get() + reg * 0x10, value);
+    }
   }
 
   uint64_t read(uint8_t reg)
   {
-    return rdmsr(0x800 + reg);
+    if (useMsr) {
+      return rdmsr(0x800 + reg);
+    } else {
+      return mmio_read<uint64_t>((uintptr_t)mmio.get() + reg * 0x10);
+    }
   }
 
   void start_secondary_cpus() {
