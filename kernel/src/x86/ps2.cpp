@@ -1,9 +1,11 @@
 #include "apic.h"
 #include "interrupt.h"
+#include "io.h"
+#include "debug.h"
 
 void SetIsaInterrupt(size_t isaInterrupt, s2::function<void()> handler);
 
-uint8_t basetable_ps2hid[257] = {
+uint8_t ps2_mode1_to_hid[257] = {
   0x00, 0x29, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2d, 0x2e, 0x2a, 0x2b, 
   0x14, 0x1a, 0x08, 0x15, 0x17, 0x1c, 0x18, 0x0c, 0x12, 0x13, 0x2f, 0x30, 0x28, 0xe0, 0x04, 0x16, 
   0x07, 0x09, 0x0a, 0x0b, 0x0d, 0x0e, 0x0f, 0x33, 0x34, 0x35, 0xe1, 0x31, 0x1d, 0x1b, 0x06, 0x19, 
@@ -25,18 +27,93 @@ uint8_t basetable_ps2hid[257] = {
   0x48
 };
 
-void ps2_keyboard_interrupt() {
+static void ps2_write_command(uint8_t command) {
+  while (inb(0x64) & 0x2) asm("pause");
+  outb(0x64, command);
+}
 
+static void ps2_write_data(uint8_t data) {
+  while (inb(0x64) & 0x2) asm("pause");
+  return outb(0x60, data);
+}
+
+static uint8_t ps2_read_data() {
+  while ((inb(0x64) & 0x1) == 0) asm("pause");
+  return inb(0x60);
+}
+
+void ps2_keyboard_interrupt() {
+  debug("[PS2] Keyboard interrupt\n");
+  while ((inb(0x64) & 0x1) == 1) {
+    uint8_t value = inb(0x60);
+    debug("Keyboard value {}\n", value);
+  }
 }
 
 void ps2_mouse_interrupt() {
-
+  debug("[PS2] Mouse interrupt\n");
+  while ((inb(0x64) & 0x1) == 1) {
+    uint8_t value = inb(0x60);
+    debug("Mouse value {}\n", value);
+  }
 }
 
 void ps2_init() {
-  SetIsaInterrupt(1, ps2_keyboard_interrupt);
-  SetIsaInterrupt(12, ps2_mouse_interrupt);
+  debug("[PS2] Init start\n");
+  ps2_write_command(0xad);
+  ps2_write_command(0xa7);
+  inb(0x60); // Not using ps2_read_data, because we want to just clear it
 
+  ps2_write_command(0x20);
+  uint8_t data = ps2_read_data() & 0xFC;
+  ps2_write_command(0x60);
+  ps2_write_data(data);
+
+  ps2_write_command(0xaa);
+  if (ps2_read_data() != 0x55) {
+    // no working ps2 controller
+    debug("[PS2] Controller not working\n");
+    return;
+  }
+
+  bool first = false, second = false;
+  ps2_write_command(0xab);
+  if (ps2_read_data() == 0) first = true;
+
+  ps2_write_command(0xa9);
+  if (ps2_read_data() == 0) second = true;
+
+  if (not first and not second) {
+    debug("[PS2] No devices found\n");
+    return;
+  }
+
+  if (first) {
+    debug("[PS2] Found first device, enabling\n");
+    data |= 1;
+    SetIsaInterrupt(1, ps2_keyboard_interrupt);
+  }
+  if (second) {
+    debug("[PS2] Found second device, enabling\n");
+    data |= 2;
+    SetIsaInterrupt(12, ps2_mouse_interrupt);
+  }
+  ps2_write_command(0x60);
+  ps2_write_data(data);
+
+  if (first) {
+    ps2_write_command(0xae);
+
+    ps2_write_data(0xf4);
+  }
+
+  if (second) {
+    ps2_write_command(0xa8);
+
+    ps2_write_command(0xd4);
+    ps2_write_data(0xf4);
+  }
+  debug("[PS2] Init done\n");
 }
 
 
