@@ -17,6 +17,7 @@
 
 #ifdef __x86_64__
 #include "x86/cpu.h"
+#include "x86/ps2.h"
 struct mb1 {
   uint32_t flags;
   uint32_t memlower;
@@ -99,7 +100,7 @@ void platform_init(void* platform_data, uint32_t magic) {
   }
   Apic::init();
   acpi_init();
-//  pci_handle_bridge(0, 0);
+  ps2_init();
 }
 #else
 #include "rpi/property_print.h"

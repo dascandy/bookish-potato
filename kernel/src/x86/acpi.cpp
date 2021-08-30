@@ -1,4 +1,5 @@
 #include "acpi.h"
+#include "apic.h"
 #include <cstdint>
 #include <cstring>
 #include "debug.h"
@@ -22,6 +23,7 @@ static_assert(sizeof(ACPIHeader) == 36);
 
 void parseMadt(const ACPIHeader* table) {
   debug("[ACPI] Found MADT at {} size {}\n", table, table->Length);
+  Apic::HandleMadt(s2::span<const uint8_t>((const uint8_t*)(table + 1), table->Length));
 }
 
 void parseFacp(const ACPIHeader* table) {
