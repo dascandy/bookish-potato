@@ -593,25 +593,32 @@ public:
   {
   }
   s2::future<void> ReadData(uint64_t physAddr, size_t length) override;
+  void EnsureSpaceFor(size_t trbCount);
   XhciUsbDevice& dev;
   uint64_t address;
   mapping map;
   xhci_command* loop;
-  uint8_t loopIndex = 0;
+  uint32_t loopIndex = 0;
   uint8_t endpointId;
   bool isIn;
 };
 
-s2::future<void> XhciEndpoint::ReadData(uint64_t physAddr, size_t length) {
-  if ((loopIndex & 0xFF) == 255) {
-    debug("[XHCI] Looping buffer back\n");
-    loop[loopIndex] = Link(map.to_physical(loop));
-    loop[loopIndex].control |= (loopIndex & 0x100 ? 0 : TRB_FLAG_C);
-    loopIndex++;
+void XhciEndpoint::EnsureSpaceFor(size_t trbCount) {
+  if (((loopIndex & 0xFF) + trbCount) < 0x100) {
+    return;
   }
+
+  debug("[XHCI] Looping buffer back\n");
+  loop[(loopIndex) % 256] = Link(map.to_physical(loop));
+  loop[(loopIndex) % 256].control |= ((loopIndex & 0x100) ? 0 : TRB_FLAG_C);
+  loopIndex = (loopIndex + 0x100) & 0xFFFFFF00;
+}
+
+s2::future<void> XhciEndpoint::ReadData(uint64_t physAddr, size_t length) {
+  EnsureSpaceFor(1);
   auto& cmd = loop[(loopIndex++) % 256];
   cmd = NormalTRB(physAddr, length, 0);
-  cmd.control |= TRB_FLAG_IOC | (loopIndex & 0x100 ? 0 : TRB_FLAG_C);
+  cmd.control |= TRB_FLAG_IOC | ((loopIndex & 0x100) ? 0 : TRB_FLAG_C);
 
   s2::future<uint64_t> statusF = dev.host->RegisterStatus(map.to_physical(&cmd));
   dev.RingDoorbell(endpointId, isIn);

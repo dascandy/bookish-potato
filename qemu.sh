@@ -18,7 +18,6 @@ qemu-system-x86_64 -machine q35 --cpu host,-x2apic -enable-kvm \
     -device usb-kbd -device usb-mouse \
     -d trace:*nvme* \
     -debugcon stdio \
-    -d trace:usb_xhci_* \
     -kernel build/amd64/bin/kernel.i386
 # -nic tap,ipv6=on,ipv4=off,model=e1000,mac=52:54:98:76:54:32
 
