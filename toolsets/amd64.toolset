@@ -1,8 +1,8 @@
 
 template: __builtin_clang
-compiler: clang++-12 --sysroot=sysroot --target=x86_64-unknown-linux-gnu -Wno-gnu-array-member-paren-init -Xclang -fcolor-diagnostics -Wall -Wextra -Werror
-compiler-cpp: clang++-12 -std=c++2a --sysroot=sysroot --target=x86_64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include -Wno-gnu-array-member-paren-init -fcolor-diagnostics -Wall -Wextra -Werror
-linker: ld -T kernel/src/link.ld.amd64
+compiler: clang++-12 --sysroot=sysroot --target=x86_64-unknown-linux-gnu -Wno-gnu-array-member-paren-init -Xclang -fcolor-diagnostics -Wall -Wextra -Werror -ffunction-sections -fdata-sections -fno-semantic-interposition
+compiler-cpp: clang++-12 -std=c++2a --sysroot=sysroot --target=x86_64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include -Wno-gnu-array-member-paren-init -Wall -Wextra -Werror -ffunction-sections -fdata-sections -fno-semantic-interposition -fcolor-diagnostics
+linker: ld -T kernel/src/link.ld.amd64 --gc-sections
 archiver: ar
 cross: true
 
