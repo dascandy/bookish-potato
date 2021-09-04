@@ -1,6 +1,7 @@
 #pragma once
 
 #include "usb/UsbCore.h"
+#include "ui.h"
 
 struct HidField {
   uint32_t usage;
@@ -9,21 +10,12 @@ struct HidField {
   bool isIndex, isRelative;
 };
 
-struct UsbHidDevice {
-  enum class Type {
-    UsbHidMouse = 0x10002,
-    UsbHidJoystick = 0x10004,
-    UsbHidGamepad = 0x10005,
-    UsbHidKeyboard = 0x10006,
-    UsbHidKeypad = 0x10007,
-    UsbHidMultiAxisController = 0x10008,
-    UsbHidTouchscreen = 0xd0004,
-  };
-
+struct UsbHidDevice : public HidDevice {
   UsbHidDevice(UsbInterface& in);
   s2::future<void> start();
   void ParseReport(s2::span<const uint8_t> data);
   void HandleReport(s2::span<const uint8_t> report);
+  Type getType() override;
   
   UsbInterface& in;
   Type deviceType;

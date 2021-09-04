@@ -2,6 +2,7 @@
 #include "debug.h"
 #include "map.h"
 #include "freepage.h"
+#include "ui.h"
 
 enum ReportEntry {
   Input = 0x80,
@@ -82,6 +83,7 @@ UsbHidDevice::UsbHidDevice(UsbInterface& in)
 : in(in)
 {
 }
+//    Ui::Compositor::Instance()->UnregisterHidDevice(*this);
 
 struct ReportState {
   uint8_t usagePage = 0;
@@ -186,6 +188,10 @@ void UsbHidDevice::ParseReport(s2::span<const uint8_t> data) {
   }
 }
 
+HidDevice::Type UsbHidDevice::getType() {
+  return deviceType;
+}
+
 s2::future<void> UsbHidDevice::start() {
   HIDDescriptor* desc = nullptr;
   EndpointDescriptor* in_ep = nullptr, *out_ep = nullptr;
@@ -221,6 +227,7 @@ s2::future<void> UsbHidDevice::start() {
   ParseReport(s2::span<const uint8_t>(reportDesc, reportDesc + len));
 
   auto in_endpoint = co_await in.StartupEndpoint(*in_ep);
+  Ui::Compositor::Instance().RegisterHidDevice(*this);
 
   uint64_t page = freepage_get_zeroed();
   mapping map(page, 0x1000, DeviceMemory);
@@ -248,14 +255,18 @@ void UsbHidDevice::HandleReport(s2::span<const uint8_t> report) {
       if (val != 0) // TODO: check if this is not a hack
         status[f.usage + val] = 1;
     } else if (f.isRelative) {
-      status[f.usage] = val;
+      if (val & (1 << (f.bitLength - 1))) {
+        status[f.usage] = val - (1 << f.bitLength);
+      } else {
+        status[f.usage] = val;
+      }
     } else {
       if (val != 0) // same, check if this is okay to do in general
         status[f.usage] = val;
     }
   }
-  for (auto [k,v] : status) {
-    debug("{x}: {}\n", k, v);
+  for (auto& l : listeners) {
+    l->HandleReport(*this, status);
   }
 }
 

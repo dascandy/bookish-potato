@@ -2,6 +2,7 @@
 #include "interrupt.h"
 #include "io.h"
 #include "debug.h"
+#include "ui.h"
 
 void SetIsaInterrupt(size_t isaInterrupt, s2::function<void()> handler);
 
@@ -42,20 +43,112 @@ static uint8_t ps2_read_data() {
   return inb(0x60);
 }
 
-void ps2_keyboard_interrupt() {
-  debug("[PS2] Keyboard interrupt\n");
-  while ((inb(0x64) & 0x1) == 1) {
-    uint8_t value = inb(0x60);
-    debug("Keyboard value {}\n", value);
+static struct Ps2Keyboard : HidDevice {
+  Ps2Keyboard() {
+    Ui::Compositor::Instance().RegisterHidDevice(*this);
   }
+  ~Ps2Keyboard() {
+    Ui::Compositor::Instance().UnregisterHidDevice(*this);
+  }
+  void HandleInterrupt() {
+    debug("[PS2] Keyboard interrupt\n");
+    while ((inb(0x64) & 0x1) == 1) {
+      buffer[offset++] = inb(0x60);
+      bool sendReport = false;
+      bool make = false;
+      uint8_t code;
+      switch(buffer[0]) {
+      case 0xE0:
+        if (offset == 2) {
+          make = (buffer[1] & 0x80);
+          code = ps2_mode1_to_hid[buffer[1] | 0x80];
+          sendReport = true;
+        }
+        break;
+      case 0xE1:
+        if (offset == 3) {
+          make = (buffer[1] & 0x80);
+          code = ps2_mode1_to_hid[0x100];
+          sendReport = true;
+        }
+        break;
+      default:
+        make = (buffer[0] & 0x80);
+        code = ps2_mode1_to_hid[buffer[0] & 0x7F];
+        sendReport = true;
+        break;
+      }
+      if (sendReport) {
+        if (make) {
+          report[code] = 1;
+        } else if (report.contains(code)) {
+          report.erase(report.find(code));
+        }
+        for (auto& l : listeners) {
+          l->HandleReport(*this, report);
+        }
+        offset = 0;
+      }
+    }
+  }
+  Type getType() override {
+    return HidDevice::Type::Keyboard;
+  }
+  s2::flatmap<uint32_t, int16_t> report;
+  uint8_t buffer[3];
+  uint8_t offset = 0;
+}* _keyb;
+
+static struct Ps2Mouse : HidDevice {
+  Ps2Mouse() {
+    Ui::Compositor::Instance().RegisterHidDevice(*this);
+  }
+  ~Ps2Mouse() {
+    Ui::Compositor::Instance().UnregisterHidDevice(*this);
+  }
+  void HandleInterrupt() {
+    debug("[PS2] Mouse interrupt\n");
+    while ((inb(0x64) & 0x1) == 1) {
+      packet[offset++] = inb(0x60);
+      if (offset == 3) {
+        s2::flatmap<uint32_t, int16_t> report;
+        if (packet[1] != 0) {
+          report[0x10030] = (packet[0] & 0x10) ? packet[1] - 0x100 : packet[1];
+        }
+        if (packet[2] != 0) {
+          // Inverted because USB expects the inverse of PS2.
+          report[0x10031] = -((packet[0] & 0x20) ? packet[2] - 0x100 : packet[2]);
+        }
+        if (packet[0] & 0x1) {
+          report[0x90001] = 1;
+        }
+        if (packet[0] & 0x2) {
+          report[0x90002] = 1;
+        }
+        if (packet[0] & 0x4) {
+          report[0x90003] = 1;
+        }
+
+        for (auto& l : listeners) {
+          l->HandleReport(*this, report);
+        }
+        offset = 0;
+      }
+    }
+  }
+  Type getType() override {
+    return HidDevice::Type::Mouse;
+  }
+  uint8_t packet[3];
+  uint8_t offset = 0;
+}* _mouse;
+
+void ps2_keyboard_interrupt() {
+  _keyb->HandleInterrupt();
 }
 
 void ps2_mouse_interrupt() {
-  debug("[PS2] Mouse interrupt\n");
-  while ((inb(0x64) & 0x1) == 1) {
-    uint8_t value = inb(0x60);
-    debug("Mouse value {}\n", value);
-  }
+  _mouse->HandleInterrupt();
 }
 
 void ps2_init() {
@@ -90,11 +183,13 @@ void ps2_init() {
 
   if (first) {
     debug("[PS2] Found first device, enabling\n");
+    _keyb = new Ps2Keyboard();
     data |= 1;
     SetIsaInterrupt(1, ps2_keyboard_interrupt);
   }
   if (second) {
     debug("[PS2] Found second device, enabling\n");
+    _mouse = new Ps2Mouse();
     data |= 2;
     SetIsaInterrupt(12, ps2_mouse_interrupt);
   }
@@ -115,6 +210,5 @@ void ps2_init() {
   }
   debug("[PS2] Init done\n");
 }
-
 
 

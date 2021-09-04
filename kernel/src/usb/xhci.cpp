@@ -190,6 +190,10 @@ enum {
   TRB_TYPE_MFINDEX_WRAP = 0x9c00,
 };
 
+static xhci_command Link(uint64_t deqPtr) {
+  return { deqPtr, 0, TRB_TYPE_LINK | 2 };
+}
+
 static xhci_command EnableSlot() {
   return { 0, 0, TRB_TYPE_ENABLE_SLOT };
 }
@@ -237,7 +241,6 @@ XhciDevice::XhciDevice(uintptr_t confSpacePtr)
 , bar1(conf, PciBars::Bar0)
 {
   currentFlag = TRB_FLAG_C;
-  currentEventFlag = TRB_FLAG_C;
   // Look up the registers for this controller
   cr = (uintptr_t)bar1.get();
   opregs = cr + (mmio_read<uint32_t>(cr + CR_CAPLENGTH) & 0xFF);
@@ -360,8 +363,9 @@ void XhciDevice::HandleInterrupt() {
   xhci_command* cmd = (xhci_command*)eventRing.get();
   size_t toRun = 1;
   while (toRun--) {
-    xhci_command& current = cmd[eventRingIndex];
-    if ((current.control & TRB_FLAG_C) != currentEventFlag) {
+    xhci_command& current = cmd[eventRingIndex % 0x100];
+    if (((current.control & TRB_FLAG_C) == TRB_FLAG_C) != 
+        ((eventRingIndex & 0x100) == 0x0)) {
       break;
     }
     uint8_t trbType = (current.control >> 10) & 0x3F;
@@ -404,7 +408,7 @@ void XhciDevice::HandleInterrupt() {
     }
     eventRingIndex++;
   }
-  mmio_write<uint64_t>(rr + RT_ERDP, eventRing.to_physical(&cmd[eventRingIndex]) | 8);
+  mmio_write<uint64_t>(rr + RT_ERDP, eventRing.to_physical(&cmd[eventRingIndex % 0x100]) | 8);
 //  debug("[XHCI] Interrupt end\n");
 }
 
@@ -599,9 +603,15 @@ public:
 };
 
 s2::future<void> XhciEndpoint::ReadData(uint64_t physAddr, size_t length) {
-  auto& cmd = loop[loopIndex++];
+  if ((loopIndex & 0xFF) == 255) {
+    debug("[XHCI] Looping buffer back\n");
+    loop[loopIndex] = Link(map.to_physical(loop));
+    loop[loopIndex].control |= (loopIndex & 0x100 ? 0 : TRB_FLAG_C);
+    loopIndex++;
+  }
+  auto& cmd = loop[(loopIndex++) % 256];
   cmd = NormalTRB(physAddr, length, 0);
-  cmd.control |= TRB_FLAG_IOC | TRB_FLAG_C;
+  cmd.control |= TRB_FLAG_IOC | (loopIndex & 0x100 ? 0 : TRB_FLAG_C);
 
   s2::future<uint64_t> statusF = dev.host->RegisterStatus(map.to_physical(&cmd));
   dev.RingDoorbell(endpointId, isIn);
@@ -634,7 +644,10 @@ s2::future<UsbEndpoint*> XhciUsbDevice::StartupEndpoint(EndpointDescriptor& desc
       }
       break;
     case 0x02:
-      // TODO: Bulk
+      epc.a = 0;
+      epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
+      epc.tr_deq_ptr = ep->address | 1;
+      epc.average = desc.maxPacketSize;
       break;
   }
 

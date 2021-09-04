@@ -34,6 +34,24 @@ void Ui::Compositor::RemoveScreen(Screen* screen) {
   }
 }
 
+void Ui::Compositor::HandleReport(HidDevice& dev, s2::flatmap<uint32_t, int16_t> report) {
+  debug("[UI] Device {x} type {} report\n", &dev, (uint32_t)dev.getType());
+  for (auto& [k,v] : report) {
+    debug("[UI]   {}={}\n", k, v);
+  }
+
+  if (dev.getType() == HidDevice::Type::Mouse) {
+    pointerX += report[0x10030];
+    if (pointerX < 0) pointerX = 0;
+    if (pointerX >= screens[0]->currentResolution.width) pointerX = screens[0]->currentResolution.width - 1;
+    pointerY += report[0x10031];
+    if (pointerY < 0) pointerY = 0;
+    if (pointerY >= screens[0]->currentResolution.height) pointerY = screens[0]->currentResolution.height - 1;
+    debug("[UI] Mouse now at {}/{}\n", pointerX, pointerY);
+    // TODO: click detection
+  }
+}
+
 Ui::Compositor& Ui::Compositor::Instance() 
 { 
   static Ui::Compositor compositor; 

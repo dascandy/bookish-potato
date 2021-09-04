@@ -35,7 +35,10 @@ void debug_field(void* value, s2::string_view spec) {
 }
 
 void debug_field(int64_t value, s2::string_view spec) {
-  if (value < 0) debug_field("-", "");
+  if (value < 0) {
+    debug_field("-", "s");
+    value = -value;
+  }
   debug_field((uint64_t)value, spec);
 }
 
