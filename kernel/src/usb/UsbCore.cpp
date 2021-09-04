@@ -6,6 +6,14 @@ UsbCore& UsbCore::Instance() {
   return core;
 }
 
+UsbEndpoint::~UsbEndpoint() {
+
+}
+
+UsbDriver::~UsbDriver() {
+
+}
+
 void UsbCore::RegisterPidVidDriver(uint16_t vid, uint16_t pid, UsbDriver& driver) {
   pidVidDrivers.emplace(((uint32_t)vid << 16) | pid, &driver);
 }

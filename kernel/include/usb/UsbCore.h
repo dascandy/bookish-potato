@@ -6,7 +6,7 @@
 #include <flatmap>
 
 struct UsbEndpoint {
-  virtual ~UsbEndpoint() = default;
+  virtual ~UsbEndpoint();
   virtual s2::future<void> ReadData(uint64_t physAddr, size_t length) = 0;
 };
 
@@ -33,7 +33,7 @@ private:
 };
 
 struct UsbDriver {
-  virtual ~UsbDriver() = default;
+  virtual ~UsbDriver();
   virtual void AddDevice(UsbDevice& dev) = 0;
   virtual void AddInterface(UsbInterface& interface) = 0;
 };

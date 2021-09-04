@@ -5,4 +5,8 @@ void RegisterDisk(Disk* disk) {
   debug("[VFS] Found disk {}\n", disk);
 }
 
+Disk::~Disk() {
+
+}
+
 
