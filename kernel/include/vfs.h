@@ -19,6 +19,7 @@ struct Disk {
 };
 
 struct Partition : Disk {
+  ~Partition() override;
   s2::future<IoMemory> read(uint64_t startblock, uint32_t blockCount) override {
     // TODO: overflow checks
     uint64_t actualStart = startblock + start;
@@ -71,10 +72,11 @@ struct File {
 };
 
 struct Filesystem {
-  virtual s2::future<s2::optional<File>> getPath(s2::span<const s2::string> path) = 0;
-  virtual s2::vector<Extent> emptySpace() = 0;
   virtual s2::pair<size_t, size_t> size() = 0;
+  virtual s2::future<s2::optional<File>> getPath(s2::span<const s2::string> path) = 0;
   virtual s2::future<File> create(File& parent, s2::string fileName) = 0;
+  virtual s2::future<bool> remove(File& f) = 0;
+  virtual s2::future<bool> rename(File& f, s2::string newName) = 0;
 };
 
 void RegisterDisk(Disk* disk);
