@@ -200,7 +200,7 @@ NvmeCommand CreateIOCQ(uintptr_t physBuffer, uint16_t qsize, uint16_t qid, uint1
 }
 NvmeCommand CreateIOSQ(uintptr_t physBuffer, uint16_t qsize, uint16_t qid, uint16_t cqid, uint16_t qprio, uint16_t nvmsetid) {
   return { 
-    0x05, 
+    0x01, 
     0,
     0,
     0,
