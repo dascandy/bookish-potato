@@ -3,11 +3,17 @@
 #include <cstdint>
 #include "map.h"
 #include <future.h>
+#include <string>
+#include <span>
+#include <optional>
 
-enum class HashType {
-  SHA1,
-  SHA256,
-  SHA512,
+enum class FilesystemType {
+  Nothing = 0,
+  Unknown = 1,
+  Mbr = 2,  // Partitioning
+  Gpt = 3,  // Partitioning
+  Fat = 4,  // FAT32 or exFAT
+  Ext = 5,  // Ext2/3/4
 };
 
 struct Disk {
@@ -16,9 +22,11 @@ struct Disk {
   virtual s2::future<void> write(uint64_t startblock, uint32_t blockCount, IoMemory& buffer) = 0;
   virtual s2::future<void> trim(uint64_t startblock, uint32_t blockCount) = 0;
   virtual s2::future<void> flush() = 0;
+  uint64_t size;
 };
 
 struct Partition : Disk {
+  Partition(Disk& disk, uint64_t start, uint64_t size);
   ~Partition() override;
   s2::future<IoMemory> read(uint64_t startblock, uint32_t blockCount) override {
     // TODO: overflow checks
@@ -36,10 +44,10 @@ struct Partition : Disk {
     return disk.trim(actualStart, blockCount);
   }
   s2::future<void> flush() override {
-    disk.flush();
+    return disk.flush();
   }
   Disk& disk;
-  uint64_t start, size;
+  uint64_t start;
 };
 
 struct Extent {
@@ -47,8 +55,10 @@ struct Extent {
   uint64_t size;
 };
 
+struct Filesystem;
+
 struct File {
-  Disk& disk;
+  Filesystem* fs;
   s2::string fileName;
   uint64_t fileSize;
   enum class Type : uint8_t {
@@ -64,21 +74,32 @@ struct File {
   } type = Type::Normal;
   s2::vector<Extent> extents;
 
-  virtual s2::future<s2::vector<File>> readdir() = 0;
-  virtual s2::future<s2::vector<uint8_t>> getHash(HashType type) = 0;
-  virtual s2::future<bool> resize(uint64_t newsize) = 0;
-  virtual s2::future<void> write(uint64_t offset, s2::span<IoMemory> data) = 0;
-  virtual s2::future<s2::vector<IoMemory>> read(uint64_t offset, uint64_t size) = 0;
+  File(Filesystem* fs, s2::string fileName, uint64_t fileSize, Type type, s2::vector<Extent> extents);
+  s2::future<s2::vector<File>> readdir();
+  s2::future<s2::vector<uint8_t>> getHash();
+  s2::future<bool> resize(uint64_t newsize);
+  s2::future<void> write(uint64_t offset, s2::span<IoMemory> data);
+  s2::future<s2::vector<IoMemory>> read(uint64_t offset, uint64_t size);
 };
 
 struct Filesystem {
+  enum class FileCreateFlags {
+    Regular = 0, // Create file if it does not exists, return existing file if it does.
+    Exclusive = 1, // Create only if it does not exist. Use this for lock files.
+    Replace = 2, // If the file exists, create a blank file instead of what's there. Only replaces regular files.
+  };
   virtual s2::pair<size_t, size_t> size() = 0;
-  virtual s2::future<s2::optional<File>> getPath(s2::span<const s2::string> path) = 0;
-  virtual s2::future<File> create(File& parent, s2::string fileName) = 0;
+  // Do not use for exclusive-create because of TOCTTOU
+  virtual s2::future<s2::optional<File>> lookup(s2::span<const s2::string> path) = 0;
+  virtual s2::future<File> create(File& parent, s2::string fileName, FileCreateFlags flags = FileCreateFlags::Regular) = 0;
   virtual s2::future<bool> remove(File& f) = 0;
   virtual s2::future<bool> rename(File& f, s2::string newName) = 0;
+
+  virtual s2::future<bool> resizeFile(File& f, uint64_t newSize) = 0;
+  virtual s2::future<s2::vector<File>> readdir(File& f) = 0;
+  virtual s2::future<s2::vector<uint8_t>> hashFile(File& f) = 0;
 };
 
-void RegisterDisk(Disk* disk);
-
+void RegisterDisk(Disk* disk, FilesystemType hint);
+void RegisterFilesystem(Filesystem* fs);
 

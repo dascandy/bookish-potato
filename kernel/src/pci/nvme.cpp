@@ -75,7 +75,7 @@ struct IdentifyController {
   uint16_t rrls;
   uint8_t res[9];
   uint8_t cntrltype;
-  uuid fguid;
+  uuid_t fguid;
   uint16_t crdt1;
   uint16_t crdt2;
   uint16_t crdt3;
@@ -173,7 +173,7 @@ struct IdentifyNamespace {
   uint8_t nsattr;
   uint16_t nvmsetid;
   uint16_t endgid;
-  uuid nguid;
+  uuid_t nguid;
   uint64_t eui64;
   uint32_t lbaf[16];
   uint8_t res3[3904];
@@ -347,6 +347,7 @@ struct NvmeDisk : Disk {
   NvmeCommand* sq;
   NvmeCompletion* cq;
   uint16_t cqi, sqi;
+  uint32_t sectorSize;
   s2::vector<s2::pair<uint16_t, s2::promise<uint64_t>>> completions;
   NvmeDisk(NvmeDevice& dev, uint16_t nsid, uint16_t diskid) 
   : dev(dev)
@@ -364,15 +365,18 @@ struct NvmeDisk : Disk {
     uint64_t status = co_await dev.RunAdminCommand(Identify(deviceMem.to_physical(ns), 0, 0, nsid, 0, 0));
     (void)status;
     uint32_t lbatype = ns->lbaf[ns->flbas & 0xF];
-    if (((lbatype >> 16) > 12) || ((lbatype >> 16) < 9)) {
-      debug("[NVME] Found invalid block size {}\n", lbatype >> 16);
+    uint8_t sectorshift = (lbatype >> 16);
+    if (sectorshift < 9 || sectorshift > 12) {
+      debug("[NVME] Found invalid block size {}\n", sectorshift);
+      co_return;
     }
-    uint32_t sectorSize = 1 << (lbatype >> 16);
-    debug("[NVME] LBA block size {}\n", 1 << (lbatype >> 16));
+    sectorSize = 1 << sectorshift;
+    debug("[NVME] LBA block size {}\n", sectorSize);
     debug("[NVME] Namespace of {} size with {} capacity, {} in use\n", sectorSize * ns->nsze, sectorSize * ns->ncap, sectorSize * ns->nuse);
+    size = ((uint64_t)sectorSize * ns->nsze / 4096);
     co_await dev.RunAdminCommand(CreateIOCQ(deviceMem.to_physical(cq), 0x100, diskid, diskid));
     co_await dev.RunAdminCommand(CreateIOSQ(deviceMem.to_physical(sq), 0x100, diskid, diskid, 3, 0));
-    RegisterDisk(this);
+    RegisterDisk(this, FilesystemType::Unknown);
   }
 private:
   s2::future<uint64_t> RunCommand(NvmeCommand cmd) {
@@ -386,10 +390,17 @@ private:
     dev.RingDoorbell(nsid*2, sqi);
     return f;
   }
-  // TODO: large reads and writes in multiple commands
+  // TODO: SGL
   s2::future<IoMemory> read(uint64_t startblock, uint32_t blockCount) override {
     IoMemory buffer(blockCount);
-    co_await RunCommand(Read(nsid, buffer.hwaddress(), startblock, blockCount));
+    s2::vector<s2::future<uint64_t>> fs;
+    fs.reserve(blockCount);
+    uint16_t sectorsPerBlock = (4096 / sectorSize);
+    for (size_t n = 0; n < blockCount; n++) {
+      fs.push_back(RunCommand(Read(nsid, buffer.hwaddress() + n * 4096, startblock + sectorsPerBlock * n, sectorsPerBlock - 1)));
+    }
+    for (auto& f : fs) co_await f;
+
     co_return s2::move(buffer);
   }
   s2::future<void> write(uint64_t startblock, uint32_t blockCount, IoMemory& buffer) override {
