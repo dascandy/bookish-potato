@@ -390,21 +390,24 @@ private:
     dev.RingDoorbell(nsid*2, sqi);
     return f;
   }
-  // TODO: SGL
-  s2::future<IoMemory> read(uint64_t startblock, uint32_t blockCount) override {
-    IoMemory buffer(blockCount);
+  s2::future<PageSGList> read(uint64_t startblock, uint32_t blockCount) override {
+    PageSGList sglist;
     s2::vector<s2::future<uint64_t>> fs;
     fs.reserve(blockCount);
+    debug("read {} {}\n", startblock, blockCount);
     uint16_t sectorsPerBlock = (4096 / sectorSize);
     for (size_t n = 0; n < blockCount; n++) {
-      fs.push_back(RunCommand(Read(nsid, buffer.hwaddress() + n * 4096, startblock + sectorsPerBlock * n, sectorsPerBlock - 1)));
+      sglist.pages.push_back(freepage_get());
+      fs.push_back(RunCommand(Read(nsid, sglist.pages.back(), (n + startblock) * sectorsPerBlock, sectorsPerBlock - 1)));
     }
     for (auto& f : fs) co_await f;
 
-    co_return s2::move(buffer);
+    co_return s2::move(sglist);
   }
-  s2::future<void> write(uint64_t startblock, uint32_t blockCount, IoMemory& buffer) override {
-    co_await RunCommand(Write(nsid, buffer.hwaddress(), startblock, blockCount));
+  s2::future<void> write(uint64_t startblock, uint32_t blockCount, PageSGList buffer) override {
+    // TODO
+//    co_await RunCommand(Write(nsid, buffer.hwaddress(), startblock, blockCount));
+    co_return;
   }
   s2::future<void> trim(uint64_t startblock, uint32_t blockCount) override {
     co_await RunCommand(Trim(nsid, startblock, blockCount));

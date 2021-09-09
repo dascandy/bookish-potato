@@ -31,7 +31,7 @@ struct gpt_entry {
 
 s2::future<bool> ParseGptPartitions(Disk* disk) {
 //  uint64_t size = disk->size;
-  IoMemory bootsector = co_await disk->read(0, 5);
+  mapping bootsector = co_await disk->read(0, 5);
 
   // Check for GPT header
   gpt_header* header = (gpt_header*)(bootsector.get() + 512);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <cstdint>
 #include <cstddef>
 #include "freepage.h"
@@ -27,15 +28,20 @@ struct PciCfgSpace;
 void platform_map(void* virt_addr, uint64_t physaddr, MappingUse use);
 uint64_t platform_unmap(void* addr);
 
+struct PageSGList {
+  s2::vector<uint64_t> pages;
+};
+
 struct mapping {
   mapping(uintptr_t address, size_t bytes, MappingUse use);
+  mapping(PageSGList list);
   mapping();
   mapping(volatile PciCfgSpace* conf, PciBars barno, MappingUse use = MappingUse::DeviceRegisters);
   mapping& operator=(mapping&&);
   mapping(mapping&&);
   uint64_t to_physical(void* p);
   ~mapping();
-  void* get();
+  uint8_t* get();
   size_t bytecount;
   uintptr_t virtaddr;
   uintptr_t address;

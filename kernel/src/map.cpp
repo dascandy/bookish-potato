@@ -154,6 +154,16 @@ mapping::mapping()
 , offset(0)
 {}
 
+mapping::mapping(PageSGList list) 
+: bytecount(4096 * list.pages.size())
+, virtaddr(asa_alloc(4096*list.pages.size()))
+, offset(0)
+{
+  for (size_t n = 0; n < list.pages.size(); n++) {
+    platform_map((void*)(virtaddr + n * 4096), list.pages[n], DeviceMemory);
+  }
+}
+
 mapping::mapping(uintptr_t address, size_t bytes, MappingUse use) 
 : bytecount(bytes)
 , virtaddr(asa_alloc(bytes))
@@ -241,8 +251,8 @@ mapping::~mapping() {
     asa_free(virtaddr, bytecount);
 }
 
-void* mapping::get() {
-  return reinterpret_cast<void*>(virtaddr + offset);
+uint8_t* mapping::get() {
+  return reinterpret_cast<uint8_t*>(virtaddr + offset);
 }
 
 uint64_t mapping::to_physical(void* p) {
