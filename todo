@@ -10,8 +10,8 @@ V RPI4-4gb support
 V Interrupt handling on rpi3b+
 V SSL implementation
 V HTTPS client
-~ NVMe storage support
-- VFS support
+V NVMe storage support
+~ VFS support
 
 - Interrupt handling on rpi4
 - PCI enumeration rpi4
