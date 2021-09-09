@@ -55,7 +55,7 @@ public:
       push_back(*it);
     }
   }
-  operator string_view() {
+  operator string_view() const {
     return string_view(data(), data() + size());
   }
   // Additional constructors, for initializing with UTF16 or UTF32 contents.

@@ -2,10 +2,22 @@
 
 namespace s2 {
 
+struct nullopt_t {};
+
 template <typename T>
 struct optional {
+  optional(T&& val)
+  {
+    (void)val;
+  }
+  optional(nullopt_t)
+  {}
+  ~optional()
+  {}
 
 };
+
+inline constexpr nullopt_t nullopt{};
 
 }
 
