@@ -2,6 +2,7 @@
 #include <flatmap>
 #include "debug.h"
 #include "blockcache.h"
+#include <cstring>
 
 FatFilesystem::FatFilesystem(Disk* disk) 
 : Filesystem(*disk)
@@ -62,7 +63,7 @@ static_assert(sizeof(ExfatBootBlock) == 120);
 
 s2::future<uint64_t> FatFilesystem::getNextCluster(uint64_t currentCluster) {
   uint64_t offset = fatOffset + currentCluster * 4;
-  mapping sector = co_await disk.read(offset / 4096, 1);
+  mapping sector = co_await Blockcache::Instance().read(&disk, offset / 4096, 1);
   uint32_t* p = (uint32_t*)sector.get();
   co_return p[offset % 4096];
 }
@@ -74,7 +75,7 @@ s2::future<s2::vector<Extent>> FatFilesystem::readFatChain(uint64_t cluster) {
   while (cluster < (byteCount / clusterSize)) {
     uint64_t next = co_await(getNextCluster(cluster));
     if (cluster + 1 != next) {
-      extents.push_back({currentCluster * clusterSize, currentCount * clusterSize});
+      extents.push_back({(clusterOffset + currentCluster * clusterSize) / 4096, (currentCount * clusterSize) / 4096});
       currentCount = 1;
     }
     cluster = next;
@@ -83,12 +84,8 @@ s2::future<s2::vector<Extent>> FatFilesystem::readFatChain(uint64_t cluster) {
 }
 
 s2::future<bool> FatFilesystem::load() {
-  mapping bootsector = co_await disk.read(0, 1);
+  mapping bootsector = co_await Blockcache::Instance().read(&disk, 0, 1);
   Fat32BootBlock* bb2 = (Fat32BootBlock*)bootsector.get();
-  for (size_t n = 0; n < 512; n++) {
-    debug("{02x} ", bootsector.get()[n]);
-    if (n % 16 == 15) debug("\n");
-  }
 
   uint64_t rootdircluster;
   if (bb2->bytespersector != 0) {
@@ -120,10 +117,103 @@ s2::future<bool> FatFilesystem::load() {
   co_return true;
 }
 
-s2::future<s2::vector<File>> FatFilesystem::readdir(File& f) {
+struct Fat32DirEntry {
+  uint8_t shortname[11]; // irrelevant
+  uint8_t attributes;
+  uint8_t winnt;
+  uint8_t ctime_tenths;
+  uint16_t ctime;
+  uint16_t cdate;
+  uint16_t adate;
+  uint16_t clusterhigh;
+  uint16_t mtime;
+  uint16_t mdate;
+  uint16_t clusterlow;
+  uint32_t size;
+};
 
-  (void)f;
-  co_return {};
+struct Fat32LfnEntry {
+  uint8_t order;
+  uint8_t lfn1[10];
+  uint8_t attr;
+  uint8_t longtype;
+  uint8_t checksum;
+  uint8_t lfn2[12];
+  uint8_t pad[2];
+  uint8_t lfn3[4];
+};
+
+s2::future<s2::vector<File>> FatFilesystem::readdir(File& d) {
+  mapping directory = co_await d.read(0, (d.fileSize + 4095) / 4096);
+  for (size_t n = 0; n < d.fileSize; n++) {
+    if (n % 16 == 0) debug("\n{06x}  ", n);
+    debug("{02x} ", directory.get()[n]);
+  }
+  s2::vector<File> files;
+  s2::vector<uint8_t> lfncache;
+  uint8_t lastLfn = 0;
+  lfncache.reserve(64);
+  Fat32DirEntry* entry = (Fat32DirEntry*)directory.get();
+  Fat32LfnEntry* lfn = (Fat32LfnEntry*)directory.get();
+  for (size_t n = 0; n < d.fileSize / sizeof(Fat32DirEntry); n++) {
+    if (entry[n].attributes == 0xF) {
+      if (lastLfn == 0) {
+        if ((lfn[n].order & 0x40) == 0x40) {
+          lastLfn = lfn[n].order & 0x3F;
+          lfncache.resize(lastLfn * 26);
+          memcpy(lfncache.data() + (lastLfn - 1) * 26, lfn[n].lfn1, 10);
+          memcpy(lfncache.data() + (lastLfn - 1) * 26 + 10, lfn[n].lfn2, 12);
+          memcpy(lfncache.data() + (lastLfn - 1) * 26 + 22, lfn[n].lfn3, 4);
+        } else {
+          debug("[FAT] Ignoring LFN entry {}\n", n);
+          lfncache.clear();
+          lastLfn = 0;
+        }
+      } else if (lfn[n].order != lastLfn - 1) {
+        debug("[FAT] Found invalid LFN continuation\n");
+        lfncache.clear();
+        lastLfn = 0;
+      } else {
+        lastLfn--;
+        memcpy(lfncache.data() + (lastLfn - 1) * 26, lfn[n].lfn1, 10);
+        memcpy(lfncache.data() + (lastLfn - 1) * 26 + 10, lfn[n].lfn2, 12);
+        memcpy(lfncache.data() + (lastLfn - 1) * 26 + 22, lfn[n].lfn3, 4);
+      }
+    } else if (entry[n].shortname[0] == 0) {
+      break;
+    } else {
+      if (lastLfn != 1) {
+        debug("[FAT] Incomplete LFN {} {x}\n", n, lastLfn);
+        lfncache.clear();
+      }
+      
+      uint32_t startcluster = ((uint32_t)entry[n].clusterhigh << 16) | (entry[n].clusterlow);
+      File f;
+      f.fs = this;
+      f.extents = co_await readFatChain(startcluster);
+      f.fileSize = entry[n].size;
+      if (lfncache.empty()) {
+        s2::string s = s2::string::from_cp437(s2::span<uint8_t>(entry[n].shortname));
+        s2::string name = s.substr(0, 8), ext = s.substr(8, 3);
+        while (not name.empty() && name.back() == ' ') name.pop_back();
+        if (ext.empty()) {
+          f.fileName = name;
+        } else {
+          f.fileName = name + "." + ext;
+        }
+      } else {
+        size_t offset = 0;
+        while (offset < lfncache.size() && lfncache[offset] != 0 && lfncache[offset + 1] != 0) offset += 2;
+        lfncache.resize(offset);
+        f.fileName = s2::string::from_utf16le(lfncache);
+      }
+      f.type = entry[n].attributes & 0x10 ? File::Type::Directory : File::Type::Normal;
+      files.push_back(s2::move(f));
+      lfncache.clear();
+      lastLfn = 0;
+    }
+  }
+  co_return s2::move(files);
 }
 
 s2::pair<size_t, size_t> FatFilesystem::size() {

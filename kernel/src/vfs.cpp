@@ -8,7 +8,7 @@
 #include "blockcache.h"
 
 s2::future<FilesystemType> SniffFilesystem(Disk* disk) {
-  mapping bootsector = co_await disk->read(0, 1);
+  mapping bootsector = co_await Blockcache::Instance().read(disk, 0, 1);
 
   // Filesystem checks in order of reliability
 
@@ -114,8 +114,27 @@ File::File(Filesystem* fs, s2::string fileName, uint64_t fileSize, Type type, s2
 , extents(extents)
 {}
 
+s2::future<s2::vector<File>> File::readdir() & {
+  return fs->readdir(*this);
+}
+
 s2::future<PageSGList> File::read(uint64_t offset, uint64_t size) {
-  co_return co_await Blockcache::Instance().read(&fs->disk, offset, size);
+  PageSGList list;
+  for (auto& e : extents) {
+    if (offset < e.size) {
+      uint64_t start = e.offset + offset;
+      uint64_t extsize = (e.size < size ? e.size : size);
+      list.append(co_await Blockcache::Instance().read(&fs->disk, start, extsize));
+      size -= extsize;
+    }
+    offset += e.size;
+    if (size == 0) break;
+  }
+  if (size != 0) {
+    // Attempted to read beyond the end of the file
+    debug("[FAT] Somebody tried to read beyond the end of the file\n");
+  } 
+  co_return list;
 }
 
 Partition::Partition(Disk& disk, uint64_t start, uint64_t size) 
@@ -131,10 +150,16 @@ Partition::~Partition() {
 
 s2::flatmap<s2::string, File> dentrycache;
 
-void RegisterFilesystem(Filesystem* fs) {
-  debug("[VFS] Found filesystem {x}\n", fs);
+s2::future<void> RegisterFilesystem(Filesystem* fs) {
+  debug("[VFS] Found filesystem of {} GiB\n", ((fs->size().first / 1024 / 1024) + 512) / 1024);
+
   // TODO: more intelligent vfs stuff
   dentrycache["/"] = fs->getroot();
+
+  auto files = co_await dentrycache["/"].readdir();
+  for (auto& f : files) {
+    debug("{s} {s} {} {}\n", f.fileName, f.type == File::Type::Normal ? "File" : "Directory", f.fileSize, f.extents.size());
+  }
 }
 
 bool isAutomountable(const File& file) {

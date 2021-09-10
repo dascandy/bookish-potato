@@ -2,6 +2,9 @@
 #include "vfs.h"
 #include "debug.h"
 #include "uuid.h"
+#include "blockcache.h"
+#include "blockcache.h"
+#include "blockcache.h"
 
 struct [[gnu::packed]] gpt_header {
   uint64_t magic;
@@ -31,7 +34,7 @@ struct gpt_entry {
 
 s2::future<bool> ParseGptPartitions(Disk* disk) {
 //  uint64_t size = disk->size;
-  mapping bootsector = co_await disk->read(0, 5);
+  mapping bootsector = co_await Blockcache::Instance().read(disk, 0, 5);
 
   // Check for GPT header
   gpt_header* header = (gpt_header*)(bootsector.get() + 512);

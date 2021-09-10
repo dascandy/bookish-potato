@@ -76,7 +76,7 @@ struct File {
 
   File(Filesystem* fs, s2::string fileName, uint64_t fileSize, Type type, s2::vector<Extent> extents);
   File();
-  s2::future<s2::vector<File>> readdir();
+  s2::future<s2::vector<File>> readdir() &;
   s2::future<s2::vector<uint8_t>> getHash();
   s2::future<bool> resize(uint64_t newsize);
   s2::future<void> write(uint64_t offset, PageSGList data);
@@ -105,7 +105,7 @@ struct Filesystem {
 };
 
 void RegisterDisk(Disk* disk, FilesystemType hint);
-void RegisterFilesystem(Filesystem* fs);
+s2::future<void> RegisterFilesystem(Filesystem* fs);
 
 s2::future<s2::optional<File>> VfsLookup(s2::string_view path);
 

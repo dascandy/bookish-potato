@@ -1,6 +1,7 @@
 #include "fs/mbr.h"
 #include "vfs.h"
 #include "debug.h"
+#include "blockcache.h"
 
 struct [[gnu::packed]] mbr_entry {
   uint8_t bootable;
@@ -15,7 +16,7 @@ s2::future<bool> ParseMbrPartitions(Disk* disk) {
   // 4k blocks
   uint64_t size = disk->size;
   debug("Loading boot sector\n");
-  mapping bootsector = co_await disk->read(0, 1);
+  mapping bootsector = co_await Blockcache::Instance().read(disk, 0, 1);
   if (bootsector.get()[510] != 0x55 && bootsector.get()[511] != 0xaa) {
     co_return false;
   }

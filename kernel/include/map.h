@@ -30,6 +30,9 @@ uint64_t platform_unmap(void* addr);
 
 struct PageSGList {
   s2::vector<uint64_t> pages;
+  void append(PageSGList&& app) {
+    pages.append(app.pages);
+  }
 };
 
 struct mapping {

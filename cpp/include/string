@@ -218,6 +218,9 @@ public:
   const_iterator end() const {
     return const_iterator(this, size());
   }
+  char32_t back() {
+    return *--end();
+  }
   void push_back(uint32_t wchar) {
     size_t bytesAdded = (wchar <= 0x7F ? 1 :
                          wchar <= 0x7FF ? 2 :

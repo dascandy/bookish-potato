@@ -89,6 +89,18 @@ namespace s2 {
         new(&buf[size_]) T();
       }
     }
+    void append(const vector<T>& rhs) {
+      reserve(size() + rhs.size());
+      for (size_t n = 0; n < rhs.size(); n++) {
+        push_back(rhs[n]);
+      }
+    }
+    void append(vector<T>&& rhs) {
+      reserve(size() + rhs.size());
+      for (size_t n = 0; n < rhs.size(); n++) {
+        push_back(s2::move(rhs[n]));
+      }
+    }
     void clear() {
       while (!empty())
         pop_back();

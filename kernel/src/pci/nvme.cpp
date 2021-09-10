@@ -387,7 +387,7 @@ private:
     s2::promise<uint64_t> p;
     s2::future<uint64_t> f = p.get_future();
     completions.push_back({currentCommand, s2::move(p)});
-    dev.RingDoorbell(nsid*2, sqi);
+    dev.RingDoorbell(nsid*2, (sqi % 0x100));
     return f;
   }
   s2::future<PageSGList> read(uint64_t startblock, uint32_t blockCount) override {
@@ -416,18 +416,27 @@ private:
     co_await RunCommand(Flush(nsid));
   }
   void HandleInterrupt() {
+    debug("{s}:{}\n", __FILE__, __LINE__);
     while (true) {
+      debug("{s}:{}\n", __FILE__, __LINE__);
       uint8_t i = cqi % 0x100;
       bool phase = not (cqi & 0x100);
       if ((cq[i].status & 1) != phase) {
-        dev.RingDoorbell(nsid*2+1, cqi);
+        dev.RingDoorbell(nsid*2+1, (cqi % 0x100)); 
+        debug("{s}:{}\n", __FILE__, __LINE__);
         return;
       }
-      for (auto& [id, p] : completions) {
+      for (size_t n = 0; n < completions.size(); n++) {
+        debug("{s}:{}\n", __FILE__, __LINE__);
+        auto& [id, p] = completions[n];
         if (id == cq[i].cmdid) {
           p.set_value((cq[i].dw0 << 16) | (cq[i].status & 0xFFFE));
+          completions[n] = s2::move(completions.back());
+          completions.pop_back();
+          break;
         }
       }
+      debug("{s}:{}\n", __FILE__, __LINE__);
       cqi++;
     }
   }
@@ -473,7 +482,7 @@ s2::future<uint64_t> NvmeDevice::RunAdminCommand(NvmeCommand cmd) {
   s2::promise<uint64_t> p;
   s2::future<uint64_t> f = p.get_future();
   completions.push_back({currentCommand, s2::move(p)});
-  RingDoorbell(0, asqi);
+  RingDoorbell(0, (asqi % 0x40));
   return f;
 }
 

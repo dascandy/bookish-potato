@@ -288,7 +288,6 @@ void PciDevice::RegisterInterruptHandler(size_t number, s2::function<void()> OnI
 
       uint32_t offset = bar_offset & 0xFFFFFFF8;
       MsiXEntry* list = (MsiXEntry*)((uintptr_t)bar.get() + offset);
-      debug("[PCI] {} {x}\n", barId, offset);
       list[number].address = tptr;
       list[number].value = data;
       list[number].flags = 0;
