@@ -11,18 +11,16 @@ V Interrupt handling on rpi3b+
 V SSL implementation
 V HTTPS client
 V NVMe storage support
-~ VFS support
+V VFS support
 
-- Interrupt handling on rpi4
-- PCI enumeration rpi4
-- memory management on rpi
+- USB hub
+- USB storage
+- USB network (ax881*)
 
-- Bootable on pinephone
-- Interrupt handling on pinephone
+- Network driver x86
+
 
 - Network stack IPv6 (SLAAC start)
-- Network driver x86
-- Network driver ARM/RPI4
 - Network stack IPv6
 - DHCPv6
 
@@ -35,6 +33,16 @@ V NVMe storage support
 - Program execution
 
 - SMP on x86
+
+
+- Network driver ARM/RPI4/USB
+
 - SMP on rpi
 - SMP on pinephone
+- Interrupt handling on rpi4
+- PCI enumeration rpi4
+- memory management on rpi4
+
+- Bootable on pinephone
+- Interrupt handling on pinephone
 
