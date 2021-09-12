@@ -15,6 +15,7 @@ struct FatFilesystem : Filesystem {
   s2::future<bool> resizeFile(File& f, uint64_t newSize) override;
   s2::future<s2::vector<File>> readdir(File& f) override;
   s2::future<s2::vector<uint8_t>> hashFile(File& f) override;
+  bool exfat = false;
   File root;
   uint64_t byteCount;
   uint64_t byteFree;

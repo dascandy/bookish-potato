@@ -155,11 +155,17 @@ s2::future<void> RegisterFilesystem(Filesystem* fs) {
 
   // TODO: more intelligent vfs stuff
   dentrycache["/"] = fs->getroot();
-
+/*
   auto files = co_await dentrycache["/"].readdir();
   for (auto& f : files) {
     debug("{s} {s} {} {}\n", f.fileName, f.type == File::Type::Normal ? "File" : "Directory", f.fileSize, f.extents.size());
   }
+  auto cstddef = files[4];
+  mapping file = co_await cstddef.read(0, (cstddef.fileSize + 4095) / 4096);
+  s2::string data{(const char*)file.get(), cstddef.fileSize};
+  debug("Cstddef:\n{s}\n", data);
+  */
+  co_return;
 }
 
 bool isAutomountable(const File& file) {
