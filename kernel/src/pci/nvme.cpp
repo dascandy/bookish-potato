@@ -394,7 +394,6 @@ private:
     PageSGList sglist;
     s2::vector<s2::future<uint64_t>> fs;
     fs.reserve(blockCount);
-    debug("read {} {}\n", startblock, blockCount);
     uint16_t sectorsPerBlock = (4096 / sectorSize);
     for (size_t n = 0; n < blockCount; n++) {
       sglist.pages.push_back(freepage_get());
@@ -416,18 +415,14 @@ private:
     co_await RunCommand(Flush(nsid));
   }
   void HandleInterrupt() {
-    debug("{s}:{}\n", __FILE__, __LINE__);
     while (true) {
-      debug("{s}:{}\n", __FILE__, __LINE__);
       uint8_t i = cqi % 0x100;
       bool phase = not (cqi & 0x100);
       if ((cq[i].status & 1) != phase) {
         dev.RingDoorbell(nsid*2+1, (cqi % 0x100)); 
-        debug("{s}:{}\n", __FILE__, __LINE__);
         return;
       }
       for (size_t n = 0; n < completions.size(); n++) {
-        debug("{s}:{}\n", __FILE__, __LINE__);
         auto& [id, p] = completions[n];
         if (id == cq[i].cmdid) {
           p.set_value((cq[i].dw0 << 16) | (cq[i].status & 0xFFFE));
@@ -436,7 +431,6 @@ private:
           break;
         }
       }
-      debug("{s}:{}\n", __FILE__, __LINE__);
       cqi++;
     }
   }

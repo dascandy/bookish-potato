@@ -18,11 +18,16 @@ qemu-system-x86_64 -machine q35 --cpu host,-x2apic -enable-kvm \
     -device intel-hda,bus=pci,addr=1 -device hda-duplex \
     -device qemu-xhci,bus=pcie.0 \
     -device usb-kbd -device usb-mouse \
-    -d trace:*nvme* \
+    -device usb-host,vendorid=0x2109,productid=0x0817 \
+    -device usb-host,vendorid=0x2109,productid=0x2817 \
     -debugcon stdio \
     -kernel build/amd64/bin/kernel.i386
 # -nic tap,ipv6=on,ipv4=off,model=e1000,mac=52:54:98:76:54:32
 
+#    -d trace:*nvme* \
 #    -device sdhci-pci --device sd-card \
 #    -device virtio-gpu,bus=pcie.0 \
+
+
+
 
