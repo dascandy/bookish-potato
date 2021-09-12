@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <experimental/coroutine>
 #include "bookish_potato_version.h"
 #include "interrupt.h"
@@ -92,9 +93,13 @@ void platform_init(void* platform_data, uint32_t magic) {
   cpu_init();
   interrupt_init();
   if (magic == 0x2badb002) {
-    mb1_init((mb1*)platform_data);
+    mb1 copy;
+    memcpy(&copy, platform_data, sizeof(mb1));
+    mb1_init(&copy);
   } else if (magic == 0x36d76289) {
-    mb2_init((mb2*)platform_data);
+    mb2 copy;
+    memcpy(&copy, platform_data, sizeof(mb2));
+    mb2_init(&copy);
   } else {
     debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
   }
