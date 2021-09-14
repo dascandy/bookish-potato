@@ -1,12 +1,14 @@
 #include "usb/UsbHub.h"
+#include "debug.h"
 
 void UsbHub::Initialize() {
   UsbCore::Instance().RegisterClassDriver(0x090000, *new UsbHub());
 }
 
-UsbHubDevice::UsbHubDevice(UsbDevice& dev) 
-: dev(dev)
+UsbHubDevice::UsbHubDevice(UsbInterface& in) 
+: in(in)
 {
+  debug("[USB] Found HUB device\n");
 }
 
 s2::future<void> UsbHubDevice::start() {
@@ -14,9 +16,9 @@ s2::future<void> UsbHubDevice::start() {
   co_return;
 }
 
-void UsbHub::AddDevice(UsbDevice& dev) {
-  (new UsbHubDevice(dev))->start();
-}
+void UsbHub::AddDevice(UsbDevice&) {}
 
-void UsbHub::AddInterface(UsbInterface&) {}
+void UsbHub::AddInterface(UsbInterface& in) {
+  (new UsbHubDevice(in))->start();
+}
 

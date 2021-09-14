@@ -39,6 +39,7 @@ void UsbCore::RegisterUsbDevice(UsbDevice& dev) {
 void UsbCore::RegisterUsbInterface(UsbInterface& dev) {
   InterfaceDescriptor* id = (InterfaceDescriptor*)dev.GetInterfaceDescriptors()[0];
   uint32_t devClass = (id->deviceClass << 16) | (id->subClass << 8) | (id->protocol);
+  debug("class {06x}\n", devClass);
   if (auto it1 = classDrivers.find(devClass); it1 != classDrivers.end()) {
     it1->second->AddInterface(dev);
   } else if (auto it2 = classDrivers.find(devClass & 0xFFFF00); it2 != classDrivers.end()) {

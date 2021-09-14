@@ -69,7 +69,6 @@ private:
   InputContext* port;
   uint8_t slotId;
   uint8_t portid;
-  DeviceDescriptor dd;
   s2::vector<ConfigurationDescriptor*> cd;
   s2::vector<UsbInterface*> activeInterfaces;
   s2::string manufacturer, product, serial, config, interface;

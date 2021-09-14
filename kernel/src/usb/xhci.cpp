@@ -574,7 +574,7 @@ s2::future<void> XhciUsbDevice::start() {
 }
 
 DeviceDescriptor& XhciUsbDevice::GetDeviceDescriptor() {
-  return dd;  
+  return port->device_descriptor;  
 }
 
 const s2::vector<ConfigurationDescriptor*>& XhciUsbDevice::GetConfigurationDescriptors() {

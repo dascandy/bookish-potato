@@ -3,9 +3,9 @@
 #include "usb/UsbCore.h"
 
 struct UsbHubDevice {
-  UsbHubDevice(UsbDevice& dev);
+  UsbHubDevice(UsbInterface& in);
   s2::future<void> start();
-  UsbDevice& dev;
+  UsbInterface& in;
 };
 
 struct UsbHub : public UsbDriver {
