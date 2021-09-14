@@ -4,6 +4,7 @@
 #include <future.h>
 #include <map.h>
 #include <flatmap>
+#include "debug.h"
 
 struct Blockcache {
   struct Entry {
@@ -19,11 +20,13 @@ struct Blockcache {
     // TODO: larger reads
     // TODO: somehow make this concurrency safe
 
+    debug("[BC] {x} {}\n", start, count);
     PageSGList full;
     auto& diskcache = entries[disk];
     for (size_t n = 0; n < count; n++) {
       Entry& ent = diskcache[start + n];
       if (ent.page == 0) {
+        debug("[BC] read {}\n", start + n);
         PageSGList mem = co_await disk->read(start + n, 1);
         ent.page = mem.pages[0];
       }

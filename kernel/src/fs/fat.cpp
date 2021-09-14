@@ -106,6 +106,7 @@ s2::future<bool> FatFilesystem::load() {
     debug("[FAT] Found exFat\n");
     exfat = true;
   }
+  if (clusterSize < 4096) co_return false;
   byteFree = 0; // to determine from fat table?
   root.fs = this;
   root.fileName = "/";

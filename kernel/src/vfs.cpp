@@ -3,7 +3,7 @@
 #include <flatmap>
 #include "fs/fat.h"
 #include "fs/mbr.h"
-//#include "fs/ext.h"
+#include "fs/ext.h"
 #include "fs/gpt.h"
 #include "blockcache.h"
 
@@ -17,7 +17,7 @@ s2::future<FilesystemType> SniffFilesystem(Disk* disk) {
     co_return FilesystemType::Gpt;
 
   // Check for valid Ext header
-  if (*(uint16_t*)(bootsector.get() + 0x38) == 0xEF53)
+  if (*(uint16_t*)(bootsector.get() + 0x438) == 0xEF53)
     co_return FilesystemType::Ext;
 
   // Check for valid Fat header
@@ -62,12 +62,13 @@ s2::future<Filesystem*> TryUse(Disk* disk, FilesystemType type) {
       co_return fs;
   }
     break;
-/*    
   case FilesystemType::Ext:
+  {
     ExtFilesystem* ext = new ExtFilesystem(disk);
-    // if failed return nullptr;
-    co_return ext;
-*/
+    if (co_await ext->load())
+      co_return ext;
+  }
+    break;
   default:
     debug("[VFS] Unknown filesystem device type\n");
     break;
@@ -148,6 +149,15 @@ Partition::~Partition() {
 
 }
 
+void AddExtent(s2::vector<Extent> &extents, Extent ext) {
+  auto& end = extents.back();
+  if (end.offset + end.size == ext.offset) {
+    end.size += ext.size;
+  } else {
+    extents.push_back(ext);
+  }
+}
+
 s2::flatmap<s2::string, File> dentrycache;
 
 s2::future<void> RegisterFilesystem(Filesystem* fs) {
@@ -155,16 +165,17 @@ s2::future<void> RegisterFilesystem(Filesystem* fs) {
 
   // TODO: more intelligent vfs stuff
   dentrycache["/"] = fs->getroot();
-/*
   auto files = co_await dentrycache["/"].readdir();
   for (auto& f : files) {
     debug("{s} {s} {} {}\n", f.fileName, f.type == File::Type::Normal ? "File" : "Directory", f.fileSize, f.extents.size());
   }
-  auto cstddef = files[4];
+  File cstddef;
+  for (auto& f : files) {
+    if (f.fileName == "cstddef") cstddef = f;
+  }
   mapping file = co_await cstddef.read(0, (cstddef.fileSize + 4095) / 4096);
   s2::string data{(const char*)file.get(), cstddef.fileSize};
   debug("Cstddef:\n{s}\n", data);
-  */
   co_return;
 }
 

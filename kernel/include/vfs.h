@@ -55,6 +55,8 @@ struct Extent {
   uint64_t size;
 };
 
+void AddExtent(s2::vector<Extent> &extents, Extent ext);
+
 struct Filesystem;
 
 struct File {
