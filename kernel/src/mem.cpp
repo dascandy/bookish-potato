@@ -12,7 +12,7 @@ struct malloc_entry {
 
 struct {
   malloc_entry ent;
-  char reserve[1024*1024*14];
+  char reserve[1024*1024*12];
 } malloc_reserve;
 
 malloc_entry* last_used = &malloc_reserve.ent;
