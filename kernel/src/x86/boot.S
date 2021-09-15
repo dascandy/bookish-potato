@@ -15,7 +15,6 @@ _start:
   movl $0x1007, %es:0x1ff8
   movl $0x2007, %es:0x1000
   movl $0x3007, %es:0x2000
-  movl $0x00000087, %es:0x3000
   movl $0x00200087, %es:0x3008
   movl $0x00400087, %es:0x3010
   movl $0x00600087, %es:0x3018
@@ -55,7 +54,7 @@ lm_entry:
     movw %ax, %es
     movw %ax, %ds
     movw %ax, %ss
-    movq $0x9fff8, %rsp
+    movq $0x3ffff8, %rsp
     movq %rbx, %rdi
     movq %rbp, %rsi
     jmp     kernel_entry
