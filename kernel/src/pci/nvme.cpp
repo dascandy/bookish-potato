@@ -301,7 +301,7 @@ NvmeCommand Read(uint16_t nsid, uintptr_t targetBuffer, uint64_t startLba, uint1
     0,
     (uint32_t)(startLba & 0xFFFFFFFF),
     (uint32_t)(startLba >> 32),
-    blockCount,
+    (uint32_t)(blockCount - 1),
     0,
     0,
     0
