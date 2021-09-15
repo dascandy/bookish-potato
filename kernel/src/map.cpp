@@ -166,7 +166,6 @@ mapping::mapping(PageSGList list)
 
 mapping::mapping(uintptr_t address, size_t bytes, MappingUse use) 
 : bytecount(bytes)
-, virtaddr(asa_alloc(bytes))
 , address(address)
 , offset(address & 0xFFF)
 {
@@ -174,6 +173,7 @@ mapping::mapping(uintptr_t address, size_t bytes, MappingUse use)
     bytes += 0x1000;
     address -= address & 0xFFF;
   }
+  virtaddr = asa_alloc((bytes + 0xFFF) & ~0xFFF);
   for (size_t n = 0; n < bytecount; n += 4096) {
     platform_map((void*)(virtaddr + n), address + n, use);
   }

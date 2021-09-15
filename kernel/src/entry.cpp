@@ -11,6 +11,7 @@
 #include "future.h"
 #include "freepage.h"
 #include "asa.h"
+#include "map.h"
 #include "event.h"
 #include "timer.h"
 #include "io.h"
@@ -50,11 +51,12 @@ struct mb1_memory {
 void mb1_init(mb1* data) {
   if (data->flags & 0x40) {
     debug("[PLAT] MB1 has memory map\n");
-    size_t stride = *(uint32_t*)((uintptr_t)data->mmap_addr );
+    mapping pd(data->mmap_addr, data->mmap_length, ReadOnlyMemory);
+    size_t stride = *(uint32_t*)(pd.get());
     if (stride < 20) stride = 24;
     size_t count = data->mmap_length / stride;
     for(size_t n = 0; n < count; n++) {
-      mb1_memory* m = (mb1_memory*)((uintptr_t)data->mmap_addr + 4 + n * (stride + 4));
+      mb1_memory* m = (mb1_memory*)(pd.get() + 4 + n * (stride + 4));
       if (m->type == 1) {
         uintptr_t start = m->base_addr;
         size_t length = m->length;
@@ -65,7 +67,17 @@ void mb1_init(mb1* data) {
         }
         if (length & 0xFFF) length -= (length & 0xFFF);
         debug("[PLAT] Found {} pages at {x}\n", length / 4096, start);
-        freepage_add_region(m->base_addr, m->length);
+        if (start < 0x1000000) {
+          uint32_t toskip = 0x1000000 - start;
+          if (length < toskip) {
+            debug("[PLAT] Skipping entirely\n");
+            continue;
+          }
+          start += toskip;
+          length -= toskip;
+          debug("[PLAT]     Adjusted to {} pages at {x}\n", length / 4096, start);
+        }
+        freepage_add_region(start, length);
       }
     }
   }
@@ -90,15 +102,18 @@ void mb2_init(mb2* data) {
 }
 
 void platform_init(void* platform_data, uint32_t magic) {
+  freepage_add_region(0x100000, 0x100000);
   cpu_init();
   interrupt_init();
   if (magic == 0x2badb002) {
+    mapping pd((uintptr_t)platform_data, sizeof(mb1), ReadOnlyMemory);
     mb1 copy;
-    memcpy(&copy, platform_data, sizeof(mb1));
+    memcpy(&copy, pd.get(), sizeof(mb1));
     mb1_init(&copy);
   } else if (magic == 0x36d76289) {
+    mapping pd((uintptr_t)platform_data, sizeof(mb2), ReadOnlyMemory);
     mb2 copy;
-    memcpy(&copy, platform_data, sizeof(mb2));
+    memcpy(&copy, pd.get(), sizeof(mb2));
     mb2_init(&copy);
   } else {
     debug("[PLAT] No MB data found, continuing without. This is broken, fyi.\n");
