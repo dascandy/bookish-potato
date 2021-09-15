@@ -65,7 +65,7 @@ static struct idt_entry {
 } idt[0x100];
 
 extern void x8664_oninterrupt();
-static char stack_for_interrupts[4096] __attribute__((aligned(4096)));
+static char stack_for_interrupts[16384] __attribute__((aligned(4096)));
 static char stack_for_crash_exceptions[4096] __attribute__((aligned(4096)));
 
 static load _loadidt = {
