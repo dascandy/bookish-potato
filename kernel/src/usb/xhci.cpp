@@ -311,6 +311,7 @@ XhciDevice::XhciDevice(uintptr_t confSpacePtr)
   // Reset all pending interrupts
   mmio_write<uint32_t>(opregs + RT_USBSTS, mmio_read<uint32_t>(opregs + RT_USBSTS));
 
+  devices.resize(maxslots);
   //Work on ports
   debug("[XHCI] controller enabled\n", maxports);
   for (size_t n = 0; n < maxports; ++n)
