@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <new>
 #include <utility>
+#include <cassert>
 
 namespace s2 {
   template<typename T>
@@ -84,9 +85,9 @@ namespace s2 {
           pop_back();
         return;
       }
-      if (newSize < capacity_) reserve(newSize);
+      if (newSize > capacity_) reserve(newSize);
       for (; size_ < newSize; ++size_) {
-        new(&buf[size_]) T();
+        new(buf + size_) T();
       }
     }
     void append(const vector<T>& rhs) {
@@ -144,9 +145,11 @@ namespace s2 {
       return buf;
     }
     T& operator[](size_t n) {
+      assert(n < size());
       return buf[n];
     }
     const T& operator[](size_t n) const {
+      assert(n < size());
       return buf[n];
     }
     typedef T* iterator;
