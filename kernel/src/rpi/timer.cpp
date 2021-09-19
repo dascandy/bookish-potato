@@ -19,7 +19,7 @@ void timer_init(uintptr_t mmio_base) {
 
   // TODO: change timer_check to instead schedule a timer_check on the main loop to avoid race conditions
   interrupt_unmask(1);
-  interrupt_register([](){ rpi_timer_interrupt(); });
+  interrupt_register(1, [](){ rpi_timer_interrupt(); });
 }
 
 void timer_set_interrupt(uint64_t nextTimeout) {

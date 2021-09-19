@@ -1,7 +1,7 @@
 
 template: __builtin_clang
-compiler: clang++ --sysroot=sysroot --target=aarch64-unknown-linux-gnu 
-compiler-cpp: clang++ -std=c++2a --sysroot=sysroot --target=aarch64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include -ffunction-sections -fdata-sections
+compiler: clang++-12 --sysroot=sysroot --target=aarch64-unknown-linux-gnu 
+compiler-cpp: clang++-12 -std=c++2a --sysroot=sysroot --target=aarch64-unknown-linux-gnu -fno-rtti -fno-exceptions -Icpp/include -ffunction-sections -fdata-sections
 # -mcpu=cortex-a72 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hardfp
 linker: ld.lld -T kernel/src/link.ld.rpi4 --gc-sections
 archiver: ar

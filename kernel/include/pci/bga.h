@@ -5,8 +5,6 @@
 #include "map.h"
 #include "Screen.h"
 
-#ifdef __x86_64__
-
 class BgaFramebuffer final : public PciDevice {
 public:
   struct BgaScreen : public Screen {
@@ -27,7 +25,5 @@ private:
   mapping regs;
   BgaScreen screen;
 };
-
-#endif
 
 

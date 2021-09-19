@@ -31,6 +31,14 @@ void interrupt_init(uintptr_t mmio_base) {
   asm volatile ("msr daifclr, #0x7");
 }
 
+void plat_endofinterrupt() {
+
+}
+
+void platform_enable_interrupts() {
+
+}
+
 void halt_for_interrupts() {
   // enable interrupts
   asm volatile ("wfe");
@@ -116,7 +124,6 @@ extern "C" void fiq_handler(unsigned long type, unsigned long esr, unsigned long
 
 extern "C" void irq_handler(unsigned long type, unsigned long esr, unsigned long elr, unsigned long spsr, unsigned long far) {
   interrupt_check();
-//  crash(type, esr, elr, spsr, far);
 }
 
 #endif

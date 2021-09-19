@@ -7,6 +7,7 @@
 #include "map.h"
 #include <cassert>
 
+#ifdef __x86_64__
 struct Hpet {
   static const uint64_t HpetCapId = 0x0;
   static const uint64_t HpetGenCfg = 0x10;
@@ -69,7 +70,6 @@ struct Hpet {
   uint64_t clkperiodInFs;
 };
 
-#ifdef __x86_64__
 Hpet* hpet = nullptr;
 
 void timer_init(uintptr_t hpet) {

@@ -18,6 +18,7 @@
 #include "usb/UsbDrivers.h"
 
 #ifdef __x86_64__
+
 #include "x86/cpu.h"
 #include "x86/ps2.h"
 struct mb1 {
@@ -132,8 +133,6 @@ void platform_init(void* platform_data, uint32_t magic) {
 
 void timer_init(uintptr_t base);
 
-void interrupt_check();
-
 void platform_init(void* platform_data, uint32_t magic) {
   rpi_entry model = getModel();
   debug_init(model.mmio_base);
@@ -146,7 +145,10 @@ void platform_init(void* platform_data, uint32_t magic) {
   debug("[PLAT] Found Raspberry Pi {s} (rev {s} with {}MB RAM, modelno {x} manufactured by {s}\n", model.modelname, model.revision, model.memory, model.modelno, model.manufacturer);
 
   RpiFramebuffer* fb = RpiFramebuffer::Create();
-  debug("[PLAT] Found monitor {s} {s} serial# {s} at resolution {}x{}\n", fb->m.brand, fb->m.name, fb->m.serial, fb->m.width, fb->m.height);
+  Screen* scr = fb->getScreen(0);
+  debug("[PLAT] Found monitor {s} {s} serialno {s} resolution {}x{}\n", 
+        scr->manufacturer, scr->name, scr->serialno, 
+        scr->currentResolution.width, scr->currentResolution.height);
 
 //  sd_init(model.mmio_base + 0x00300000);
 }
@@ -177,14 +179,8 @@ extern "C" void kernel_entry(void* platform_data, uint32_t magic) {
   platform_init(platform_data, magic);
   set_utc_offset(1591473338000000 - get_timer_value());
   debug("[ENTRY] End of platform init\n");
-  platform_enable_interrupts();  
+  platform_enable_interrupts();
   f();
-/*
-  while (1) {
-    interrupt_check();
-    debug("current timer is {}\r", get_timer_value());
-  }
-  */
   while(1) {}
 }
 

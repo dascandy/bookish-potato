@@ -2,6 +2,7 @@
 #include "debug.h"
 #include <cstring>
 
+#ifdef __x86_64__
 void cpu_init() {
   auto zero = cpuid(0);
   uint32_t max = zero.eax;
@@ -35,4 +36,5 @@ void cpu_init() {
   debug("[CPU] {} phys addr bits, {} linear addr bits, {} cores\n", (cpuinfo.eax & 0xFF), (cpuinfo.eax & 0xFF00) >> 8, (cpuinfo.ecx & 0xFF) + 1);
 }
 
+#endif
 

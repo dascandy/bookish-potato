@@ -6,6 +6,15 @@
 
 s2::flatmap<uint32_t, s2::vector<s2::function<void()>>> handlers;
 
+void interrupt_check() {
+  for (auto& [id, v] : handlers) {
+    for (auto& h : v) {
+      h();
+    }
+  }
+  plat_endofinterrupt();
+}
+
 void interrupt_check(int vector) {
   //debug("[INT] Got interrupt {}\n", vector);
   auto it = handlers.find(vector);

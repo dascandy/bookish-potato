@@ -4,6 +4,7 @@
 #include "debug.h"
 #include "ui.h"
 
+#ifdef __x86_64__
 void SetIsaInterrupt(size_t isaInterrupt, s2::function<void()> handler);
 
 uint8_t ps2_mode1_to_hid[257] = {
@@ -210,5 +211,5 @@ void ps2_init() {
   }
   debug("[PS2] Init done\n");
 }
-
+#endif
 
