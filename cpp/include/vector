@@ -40,6 +40,10 @@ namespace s2 {
       reserve(e-b);
       while (b != e) push_back(*b++);
     }
+    template <size_t N>
+    vector(T (&arr)[N]) : vector(arr, arr+N)
+    {
+    }
     template <typename U>
     vector(U u) : vector(u.begin(), u.end()) {}
     vector& operator=(const vector& v) {
