@@ -15,10 +15,8 @@ V VFS support
 
 - USB hub
 - USB storage
-- USB network (ax881*)
-
-- Network driver x86
-
+- USB network ethernet (ax881*)
+- USB network wifi (...)
 
 - Network stack IPv6 (SLAAC start)
 - Network stack IPv6
@@ -32,11 +30,10 @@ V VFS support
 - POSIX emulation layer
 - Program execution
 
+
+
+
 - SMP on x86
-
-
-- Network driver ARM/RPI4/USB
-
 - SMP on rpi
 - SMP on pinephone
 - Interrupt handling on rpi4
