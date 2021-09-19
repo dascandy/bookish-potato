@@ -594,6 +594,7 @@ public:
   {
   }
   s2::future<void> ReadData(uint64_t physAddr, size_t length) override;
+  s2::future<void> WriteData(uint64_t physAddr, size_t length) override;
   void EnsureSpaceFor(size_t trbCount);
   XhciUsbDevice& dev;
   uint64_t address;
@@ -614,6 +615,24 @@ void XhciEndpoint::EnsureSpaceFor(size_t trbCount) {
   loop[(loopIndex) % 256].control |= ((loopIndex & 0x100) ? 0 : TRB_FLAG_C);
   loopIndex = (loopIndex + 0x100) & 0xFFFFFF00;
 }
+
+s2::future<void> XhciEndpoint::WriteData(uint64_t physAddr, size_t length) {
+  EnsureSpaceFor(1);
+  auto& cmd = loop[(loopIndex++) % 256];
+  cmd = NormalTRB(physAddr, length, 0);
+  cmd.control |= TRB_FLAG_IOC | ((loopIndex & 0x100) ? 0 : TRB_FLAG_C);
+
+  s2::future<uint64_t> statusF = dev.host->RegisterStatus(map.to_physical(&cmd));
+  dev.RingDoorbell(endpointId, isIn);
+  uint64_t status = co_await statusF;
+  if ((status >> 56) != XHCI_COMPLETION_SUCCESS) {
+    debug("[XHCI] Read data request failed\n");
+  }
+}
+//static xhci_command NormalTRB(uint64_t dataBuffer, uint32_t trbBytes, uint8_t td_size) {
+//  return { dataBuffer, (td_size << 17) | (trbBytes), TRB_TYPE_NORMAL };
+//}
+
 
 s2::future<void> XhciEndpoint::ReadData(uint64_t physAddr, size_t length) {
   EnsureSpaceFor(1);
@@ -646,17 +665,19 @@ s2::future<UsbEndpoint*> XhciUsbDevice::StartupEndpoint(EndpointDescriptor& desc
           intervalSel++;
         }
         epc.a = (intervalSel << 16);
-        epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
+        epc.b = (desc.maxPacketSize << 16) | (epType << 3) | (isIn << 5) | 6;
         epc.tr_deq_ptr = ep->address | 1;
         epc.average = desc.maxPacketSize | (desc.maxPacketSize << 16);
       }
       break;
     case 0x02:
       epc.a = 0;
-      epc.b = (desc.maxPacketSize << 16) | (epType << 4) | (isIn << 3) | 6;
+      epc.b = (desc.maxPacketSize << 16) | (epType << 3) | (isIn << 5) | 6;
       epc.tr_deq_ptr = ep->address | 1;
       epc.average = desc.maxPacketSize;
       break;
+    default:
+      debug("INVALID EP TYPE\n");
   }
 
   port->a = (1 << (epId * 2 + isIn)) | 1;

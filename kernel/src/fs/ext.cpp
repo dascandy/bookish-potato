@@ -225,15 +225,17 @@ struct ExtIndirectBlocks {
 
 s2::future<s2::vector<Extent>> ExtFilesystem::ReadExtents(ExtExtent* ext) {
   s2::vector<Extent> rv;
+  debug("Extents\n");
   assert(ext->h.depth == 0);
   for (size_t n = 0; n < ext->h.entrycount; n++) {
-    AddExtent(rv, {firstBlock + ((uint64_t)ext->leaf[n].start_hi << 32) + ext->leaf[n].start_lo, ext->leaf[n].len});
+    AddExtent(rv, {((uint64_t)ext->leaf[n].start_hi << 32) + ext->leaf[n].start_lo, ext->leaf[n].len});
   }
   co_return s2::move(rv);
 }
 
 s2::future<s2::vector<Extent>> ExtFilesystem::ReadIndirects(ExtIndirectBlocks* ind) {
   s2::vector<Extent> rv;
+  debug("Indirects\n");
   assert(ind->ind1 == 0 && ind->ind2 == 0 && ind->ind3 == 0);
   for (size_t n = 0; n < 12; n++) {
     AddExtent(rv, Extent{ind->direct[n], 1});
@@ -324,6 +326,7 @@ s2::future<s2::vector<File>> ExtFilesystem::readdir(File& d) {
     if (dirEnt->inode != 0) {
       File f = co_await readInode(dirEnt->inode);
       f.fileName = s2::string(dirEnt->filename, dirEnt->filename + dirEnt->namelen);
+      debug("{s} {} {} {}\n", f.fileName, f.fileSize, dirEnt->inode, (uint32_t)f.type);
       files.push_back(s2::move(f));
     }
     if (dirEnt->reclen < 9) { // Ended up desynced (corrupted), just stop here.

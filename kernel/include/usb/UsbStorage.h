@@ -1,23 +1,27 @@
 #pragma once
 
-#include <cstdint>
+#include "usb/UsbCore.h"
+#include "map.h"
+#include "vfs.h"
 
-[[gnu::packed]] struct UsbStorageCbw {
-  uint32_t signature;
-  uint32_t tag;
-  uint32_t length;
-  uint8_t direction;
-  uint8_t lun;
-  uint8_t cmdLength;
-  uint8_t command[32];
+struct UsbStorageDevice final : public Disk {
+  UsbStorageDevice(UsbInterface& in);
+  s2::future<void> start();
+  UsbInterface& in;
+  UsbEndpoint* oute;
+  UsbEndpoint* ine;
+  uint32_t sectorsize;
+  s2::future<s2::pair<uint8_t, uint32_t>> RunCommand(s2::span<const uint8_t> command, bool write, uint8_t lun, size_t transferSize, PageSGList buffer);
+  s2::future<PageSGList> read(uint64_t startblock, uint32_t blockCount);
+  s2::future<void> write(uint64_t startblock, uint32_t blockCount, PageSGList buffer);
+  s2::future<void> trim(uint64_t startblock, uint32_t blockCount);
+  s2::future<void> flush();
 };
 
-[[gnu::packed]] struct UsbStorageCsw {
-  uint32_t signature;
-  uint32_t tag;
-  uint32_t residue;
-  uint8_t status;
+struct UsbStorage : public UsbDriver {
+  static void Initialize();
+  void AddDevice(UsbDevice& dev) override;
+  void AddInterface(UsbInterface& interface) override;
 };
-
 
 

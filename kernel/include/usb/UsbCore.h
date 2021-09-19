@@ -8,6 +8,7 @@
 struct UsbEndpoint {
   virtual ~UsbEndpoint();
   virtual s2::future<void> ReadData(uint64_t physAddr, size_t length) = 0;
+  virtual s2::future<void> WriteData(uint64_t physAddr, size_t length) = 0;
 };
 
 struct UsbDevice {
