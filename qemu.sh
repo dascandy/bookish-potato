@@ -11,20 +11,21 @@ qemu-system-x86_64 -machine q35 --cpu host,-x2apic -enable-kvm \
     -smp cores=8,sockets=1 \
     -vga none \
     -m 4G \
-    -device nvme,drive=D22,serial=1234 \
+    -d trace:*usb* \
     -drive file=disk.img,if=none,id=D22,driver=file \
     -device bochs-display,bus=pcie.0 \
     -device pcie-pci-bridge,id=pci,bus=pcie.0 \
     -device intel-hda,bus=pci,addr=1 -device hda-duplex \
     -device qemu-xhci,bus=pcie.0 \
-    -device usb-kbd -device usb-mouse \
-    -device usb-host,vendorid=0x2109,productid=0x0817 \
-    -device usb-host,vendorid=0x2109,productid=0x2817 \
+    -device usb-storage,drive=D22 \
     -debugcon stdio \
     -kernel build/amd64/bin/kernel.i386
 # -nic tap,ipv6=on,ipv4=off,model=e1000,mac=52:54:98:76:54:32
 
-#    -d trace:*nvme* \
+#    -device usb-kbd -device usb-mouse \
+#    -device usb-host,vendorid=0x2109,productid=0x0817 \
+#    -device usb-host,vendorid=0x2109,productid=0x2817 \
+#    -device nvme,drive=D22,serial=1234 \
 #    -device sdhci-pci --device sd-card \
 #    -device virtio-gpu,bus=pcie.0 \
 
