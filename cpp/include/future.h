@@ -16,16 +16,20 @@ struct shared_state {
 public:
   shared_state& operator=(const shared_state&) = delete;
   void set_value(T&& value) {
-    s2::unique_lock<s2::mutex> l(m);
-    if (is_ready()) {
-      assert(false);
+    s2::vector<std::experimental::coroutine_handle<>> local_awaitings;
+    {
+      s2::unique_lock<s2::mutex> l(m);
+      if (is_ready()) {
+        assert(false);
+      }
+      v = s2::move(value);
+      cv.notify_all();
+      std::swap(local_awaitings, awaitings)
     }
-    v = s2::move(value);
-    cv.notify_all();
+    
     for (auto& aw : awaitings) {
       aw.resume();
     }
-    awaitings.clear();
   }
   T& get() {
     s2::unique_lock<s2::mutex> l(m);
