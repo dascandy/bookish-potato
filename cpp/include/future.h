@@ -27,7 +27,7 @@ public:
       std::swap(local_awaitings, awaitings)
     }
     
-    for (auto& aw : awaitings) {
+    for (auto& aw : local_awaitings) {
       aw.resume();
     }
   }
